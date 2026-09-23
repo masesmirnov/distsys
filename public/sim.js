@@ -520,6 +520,8 @@ class Lab {
     this.emit = emit;
     this.scenarioId = 'story';
     this.seed = 1;
+    this.speed = 1;
+    this.speedTimer = 0;
     this.playing = false;
     this.stepping = false;
     this.visible = false;
@@ -547,7 +549,18 @@ class Lab {
     this.resetButton.type = 'button';
     this.resetButton.setAttribute('aria-label', 'Заново');
     this.resetButton.title = 'Заново';
-    head.append(this.select, this.playButton, this.stepButton, this.resetButton);
+    this.speedBox = element('label', 'speed');
+    this.speedBox.title = 'Скорость прогона';
+    this.speedInput = element('input');
+    this.speedInput.type = 'range';
+    this.speedInput.min = '0';
+    this.speedInput.max = '1';
+    this.speedInput.step = '0.01';
+    this.speedInput.value = '1';
+    this.speedInput.setAttribute('aria-label', 'Скорость прогона');
+    this.speedValue = element('output', '', '1.00');
+    this.speedBox.append(this.speedInput, this.speedValue);
+    head.append(this.select, this.speedBox, this.playButton, this.stepButton, this.resetButton);
 
     const stage = element('div', 'stage');
     const users = element('div', 'users');
@@ -580,6 +593,11 @@ class Lab {
     this.stepButton.addEventListener('click', () => this.control('step'));
     this.resetButton.addEventListener('click', () => this.control('reset'));
     this.select.addEventListener('change', () => this.control('play', this.select.value));
+    this.speedInput.addEventListener('input', () => {
+      this.showSpeed(Number(this.speedInput.value));
+      if (!this.speedTimer) this.speedTimer = setTimeout(() => this.shareSpeed(), 150);
+    });
+    this.speedInput.addEventListener('change', () => this.shareSpeed());
   }
 
   codePane(spec) {
@@ -615,17 +633,32 @@ class Lab {
       mode,
       scenario,
       seed: restart ? (SCENARIOS[scenario].random ? Math.floor(Math.random() * 2 ** 31) : 1) : this.seed,
-      at: restart ? 0 : Math.round(this.now * 1000) / 1000
+      at: restart ? 0 : Math.round(this.now * 1000) / 1000,
+      speed: this.speed
     };
     this.applyState(state);
     this.emit(state);
+  }
+
+  showSpeed(speed) {
+    this.speed = Math.max(0, Math.min(1, Math.round(speed * 100) / 100));
+    this.speedInput.value = String(this.speed);
+    this.speedValue.textContent = this.speed.toFixed(2);
+  }
+
+  shareSpeed() {
+    clearTimeout(this.speedTimer);
+    this.speedTimer = 0;
+    const mode = this.finished ? 'pause' : this.playing ? (this.stepping ? 'step' : 'play') : 'pause';
+    this.emit({ t: 'lab', lab: this.kind, mode, scenario: this.scenarioId, seed: this.seed, at: Math.round(this.now * 1000) / 1000, speed: this.speed });
   }
 
   applyState(state, elapsed = 0) {
     this.scenarioId = state.scenario;
     this.select.value = state.scenario;
     this.seed = state.seed;
-    this.seek(state.mode === 'play' ? state.at + elapsed / UNIT_MS : state.at);
+    this.showSpeed(typeof state.speed === 'number' ? state.speed : 1);
+    this.seek(state.mode === 'play' ? state.at + elapsed * this.speed / UNIT_MS : state.at);
     if (this.finished) return;
     if (state.mode === 'play') this.play();
     else if (state.mode === 'step') this.step();
@@ -682,7 +715,7 @@ class Lab {
 
   tick(ms) {
     if (!this.playing) return;
-    let target = this.now + ms / UNIT_MS;
+    let target = this.now + ms * (this.stepping ? 1 : this.speed) / UNIT_MS;
     for (;;) {
       const next = this.sim.nextTime();
       if (next === null || next > target || this.sim.time > TIME_LIMIT) break;
@@ -916,7 +949,7 @@ export async function mountLabs(emit) {
       for (const lab of labs) {
         const state = states[lab.kind];
         if (state) lab.applyState(state, Math.max(0, now - state.stamp));
-        else lab.applyState({ lab: lab.kind, mode: 'reset', scenario: 'story', seed: 1, at: 0 });
+        else lab.applyState({ lab: lab.kind, mode: 'reset', scenario: 'story', seed: 1, at: 0, speed: 1 });
       }
     }
   };

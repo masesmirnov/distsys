@@ -285,6 +285,20 @@ h3 { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
   background: var(--surface);
   cursor: pointer;
 }
+.speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.speed input { width: 120px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.speed output { min-width: 3.4ch; text-align: right; font-variant-numeric: tabular-nums; }
 .play-button { min-width: 112px; justify-content: center; }
 .play-button.primary { background: var(--ink); color: var(--page); border-color: var(--ink); }
 .play-button.primary:hover { background: var(--muted); border-color: var(--muted); }

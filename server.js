@@ -398,7 +398,9 @@ function apply(room, peer, op) {
       const at = Number(op.at);
       if (!LABS.has(op.lab) || !LAB_MODES.has(op.mode) || !SCENARIOS.has(op.scenario)) return null;
       if (!Number.isInteger(op.seed) || op.seed < 0 || op.seed >= 2 ** 31 || !Number.isFinite(at) || at < 0 || at > 1000) return null;
-      const state = { t: 'lab', lab: op.lab, mode: op.mode, scenario: op.scenario, seed: op.seed, at };
+      const speed = op.speed === undefined ? 1 : Number(op.speed);
+      if (!Number.isFinite(speed) || speed < 0 || speed > 1) return null;
+      const state = { t: 'lab', lab: op.lab, mode: op.mode, scenario: op.scenario, seed: op.seed, at, speed: Math.round(speed * 100) / 100 };
       room.labs[op.lab] = { ...state, stamp: Date.now() };
       return state;
     }
