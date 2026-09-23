@@ -261,7 +261,7 @@ class EooReceiver {
       return { lines, note: `#${seq} — его очередь → отдаём${rest}, ACK` };
     }
     this.buffer.set(seq, msg.text);
-    lines.push(178, 179);
+    lines.push(179);
     return { lines, note: `#${seq}, а ждём #${this.expected} → в буфер, ACK` };
   }
 }

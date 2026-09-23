@@ -135,7 +135,7 @@ function storageChart(root, results, n) {
       label.setAttribute('x', x2 - 6);
       label.setAttribute('text-anchor', 'end');
       label.setAttribute('class', 'value');
-      label.style.fill = '#fff';
+      label.style.fill = item.chosen ? '#fff' : 'var(--ink)';
     }
     chart.append(label);
   });
@@ -163,7 +163,7 @@ function storageChart(root, results, n) {
 }
 
 function delayTable(root, results) {
-  const solution = { overhead: results.overhead, failures: [], tests: results.tests };
+  const solution = { overhead: results.overhead, failures: results.tests.filter(test => test.status !== 'PASSED'), tests: results.tests };
   const variants = [
     ['2.0', results.variants['delay-2.0']],
     ['3.0', results.variants['delay-3.0']],

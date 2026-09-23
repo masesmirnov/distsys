@@ -74,6 +74,11 @@ class Board {
     this.cursorTimer = 0;
     this.pointer = null;
     this.sharedCursor = null;
+    this.sending = false;
+    this.online = false;
+    this.me = null;
+    this.backoff = 0;
+    this.reconnectTimer = 0;
     this.active = null;
     this.fullWarned = false;
     this.counter = 0;
@@ -278,15 +283,19 @@ class Board {
     const known = this.strokes.get(stroke.id);
     if (!known || known.k !== 'laser') return;
     clearTimeout(known.fade);
+    clearTimeout(known.gone);
+    known.path.classList.remove('fading');
     known.fade = setTimeout(() => {
       known.path.classList.add('fading');
-      setTimeout(() => this.removeStroke(known.id), 950);
-    }, known.done ? 250 : 900);
+      known.gone = setTimeout(() => this.removeStroke(known.id), 950);
+    }, known.done ? 300 : 6000);
   }
 
   removeStroke(id) {
     const stroke = this.strokes.get(id);
     if (!stroke) return;
+    clearTimeout(stroke.fade);
+    clearTimeout(stroke.gone);
     stroke.path.remove();
     this.strokes.delete(id);
     this.refreshInked();
@@ -308,23 +317,26 @@ class Board {
 
   send(op) {
     this.queue.push(op);
-    if (!this.flushTimer) this.flushTimer = setTimeout(() => this.flush(), FLUSH_MS);
+    if (this.queue.length > 2000) this.queue.splice(0, this.queue.length - 2000);
+    this.schedule(FLUSH_MS);
+  }
+
+  schedule(delay) {
+    if (!this.flushTimer && !this.sending) this.flushTimer = setTimeout(() => this.flush(), delay);
   }
 
   async flush() {
     this.flushTimer = 0;
     if (this.active && !this.active.eraser) this.flushPoints(this.active);
-    if (!this.queue.length || !this.online) {
-      this.queue = [];
-      return;
-    }
+    if (!this.queue.length || !this.online || this.sending) return;
     const ops = this.queue.splice(0, 400);
+    this.sending = true;
+    let retry = 0;
     try {
       const response = await fetch(`api/ops?room=${encodeURIComponent(this.room)}&cid=${this.cid}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ops),
-        keepalive: true
+        body: JSON.stringify(ops)
       });
       if (response.ok) {
         const answer = await response.json();
@@ -332,21 +344,35 @@ class Board {
           this.fullWarned = true;
           toast('Доска заполнена: сотрите что-нибудь, чтобы рисовать дальше');
         }
+      } else if (response.status === 429 || response.status >= 500) {
+        this.queue.unshift(...ops);
+        retry = 400;
+      } else if (response.status === 409) {
+        this.connect();
       }
     } catch {
-      this.setOnline(false);
+      this.queue.unshift(...ops);
+      retry = 1500;
     }
-    if (this.queue.length && !this.flushTimer) this.flushTimer = setTimeout(() => this.flush(), FLUSH_MS);
+    this.sending = false;
+    if (this.queue.length) this.schedule(retry || FLUSH_MS);
   }
 
   connect() {
     if (this.source) this.source.close();
+    clearTimeout(this.reconnectTimer);
     const query = new URLSearchParams({ room: this.room, cid: this.cid, name: this.name, color: String(this.color) });
-    this.source = new EventSource('api/stream?' + query);
-    this.source.addEventListener('hello', event => this.hello(JSON.parse(event.data)));
-    this.source.addEventListener('presence', event => this.presence(JSON.parse(event.data).peers));
-    this.source.addEventListener('ops', event => this.remote(JSON.parse(event.data)));
-    this.source.addEventListener('error', () => this.setOnline(false));
+    const source = new EventSource('api/stream?' + query);
+    this.source = source;
+    source.addEventListener('hello', event => this.hello(JSON.parse(event.data)));
+    source.addEventListener('presence', event => this.presence(JSON.parse(event.data).peers));
+    source.addEventListener('ops', event => this.remote(JSON.parse(event.data)));
+    source.addEventListener('error', () => {
+      this.setOnline(false);
+      if (source !== this.source || source.readyState !== EventSource.CLOSED) return;
+      this.backoff = Math.min(15000, (this.backoff || 1000) * 2);
+      this.reconnectTimer = setTimeout(() => this.connect(), this.backoff);
+    });
   }
 
   setOnline(online) {
@@ -357,6 +383,8 @@ class Board {
   }
 
   hello(data) {
+    this.me = data.you;
+    this.backoff = 0;
     this.setOnline(true);
     for (const stroke of Array.from(this.strokes.values())) {
       if (stroke.k !== 'laser') this.removeStroke(stroke.id);
@@ -365,22 +393,23 @@ class Board {
     this.mine = this.mine.filter(id => this.strokes.has(id));
     this.presence(data.peers);
     for (const peer of data.peers) {
-      if (peer.cursor && peer.cid !== this.cid) this.moveCursor(peer.cid, peer.cursor);
+      if (peer.cursor && peer.id !== this.me) this.moveCursor(peer.id, peer.cursor);
     }
+    if (this.queue.length) this.schedule(FLUSH_MS);
   }
 
   presence(peers) {
     this.peers = peers;
     const holder = $('#peers');
     holder.replaceChildren();
-    const ordered = [...peers].sort((a, b) => (b.cid === this.cid) - (a.cid === this.cid));
+    const ordered = [...peers].sort((a, b) => (b.id === this.me) - (a.id === this.me));
     for (const peer of ordered.slice(0, 4)) {
       const node = document.createElement('span');
-      node.className = 'peer' + (peer.cid === this.cid ? ' me' : '');
+      node.className = 'peer' + (peer.id === this.me ? ' me' : '');
       node.style.background = PALETTE[peer.color] || PALETTE[1];
       node.textContent = initials(peer.name);
-      node.title = peer.cid === this.cid ? `${peer.name} (вы) — нажмите, чтобы переименоваться` : peer.name;
-      if (peer.cid === this.cid) node.addEventListener('click', () => this.rename());
+      node.title = peer.id === this.me ? `${peer.name} (вы) — нажмите, чтобы переименоваться` : peer.name;
+      if (peer.id === this.me) node.addEventListener('click', () => this.rename());
       holder.append(node);
     }
     if (ordered.length > 4) {
@@ -391,8 +420,8 @@ class Board {
       holder.append(more);
     }
     holder.setAttribute('aria-label', `Сейчас на странице: ${peers.length}`);
-    for (const cid of Array.from(this.cursors.keys())) {
-      if (!peers.some(peer => peer.cid === cid)) this.dropCursor(cid);
+    for (const id of Array.from(this.cursors.keys())) {
+      if (!peers.some(peer => peer.id === id)) this.dropCursor(id);
     }
   }
 
@@ -445,17 +474,17 @@ class Board {
     }
   }
 
-  moveCursor(cid, op) {
+  moveCursor(id, op) {
     const entry = this.surfaces.get(op.a);
-    const peer = this.peers.find(item => item.cid === cid);
+    const peer = this.peers.find(item => item.id === id);
     if (!entry || !peer) return;
-    let cursor = this.cursors.get(cid);
+    let cursor = this.cursors.get(id);
     if (!cursor) {
       const node = document.createElement('div');
       node.className = 'cursor';
       node.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cursor"/></svg><span></span>';
       cursor = { node };
-      this.cursors.set(cid, cursor);
+      this.cursors.set(id, cursor);
     }
     const color = PALETTE[peer.color] || PALETTE[1];
     cursor.node.querySelector('svg').style.fill = color;
