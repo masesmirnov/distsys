@@ -810,3 +810,6 @@ footer a { color: var(--muted); }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+.hero-links { display: flex; gap: 24px; margin: 28px 0 0; font-family: var(--mono); font-size: 15px; }
+.hero-links a { color: var(--muted); text-decoration: none; }
+.hero-links a:hover { color: var(--ink); }

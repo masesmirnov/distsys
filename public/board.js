@@ -378,9 +378,6 @@ class Board {
 
   setOnline(online) {
     this.online = online;
-    const dot = $('#status');
-    dot.classList.toggle('online', online);
-    dot.title = online ? 'Доска на связи' : 'Нет связи с доской, переподключаюсь';
   }
 
   hello(data) {
