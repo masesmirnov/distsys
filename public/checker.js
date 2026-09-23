@@ -104,49 +104,66 @@ function render(card, machine, preset, kind) {
   }
 }
 
-export function mountChecker() {
+const RUN_MS = 650;
+
+export function mountChecker(emit) {
   const select = document.getElementById('checker-preset');
   const cards = { original: document.querySelector('[data-checker="original"]'), fixed: document.querySelector('[data-checker="fixed"]') };
-  if (!select || !cards.original || !cards.fixed) return;
+  let state = { preset: 'trap', steps: 0, mode: 'pause' };
   let machines;
   let timer = 0;
-  const reset = () => {
+  const done = () => machines.original.result && machines.fixed.result;
+  const advance = () => {
+    machines.original.step();
+    machines.fixed.step();
+  };
+  const draw = () => {
+    const preset = PRESETS[state.preset];
+    render(cards.original, machines.original, preset, 'original');
+    render(cards.fixed, machines.fixed, preset, 'fixed');
+  };
+  const apply = (next, elapsed = 0) => {
     clearInterval(timer);
     timer = 0;
-    const preset = PRESETS[select.value];
+    const extra = next.mode === 'run' ? Math.floor(elapsed / RUN_MS) : 0;
+    state = { preset: next.preset, steps: next.steps + extra, mode: next.mode };
+    select.value = state.preset;
+    const preset = PRESETS[state.preset];
     machines = {
       original: new Machine(preset.sent, preset.delivered, false),
       fixed: new Machine(preset.sent, preset.delivered, true)
     };
+    for (let i = 0; i < state.steps && !done(); i++) advance();
     draw();
-  };
-  const draw = () => {
-    const preset = PRESETS[select.value];
-    render(cards.original, machines.original, preset, 'original');
-    render(cards.fixed, machines.fixed, preset, 'fixed');
-  };
-  const step = () => {
-    machines.original.step();
-    machines.fixed.step();
-    draw();
-    return machines.original.result && machines.fixed.result;
-  };
-  document.getElementById('checker-step').addEventListener('click', () => {
-    clearInterval(timer);
-    timer = 0;
-    step();
-  });
-  document.getElementById('checker-run').addEventListener('click', () => {
-    if (timer) return;
-    if (machines.original.result && machines.fixed.result) reset();
+    if (state.mode !== 'run' || done()) return;
     timer = setInterval(() => {
-      if (step()) {
+      state.steps += 1;
+      advance();
+      draw();
+      if (done()) {
         clearInterval(timer);
         timer = 0;
       }
-    }, 650);
+    }, RUN_MS);
+  };
+  const control = next => {
+    const message = { t: 'checker', ...next };
+    apply(message);
+    emit(message);
+  };
+  document.getElementById('checker-step').addEventListener('click', () => {
+    control({ preset: state.preset, steps: done() ? 1 : state.steps + 1, mode: 'pause' });
   });
-  document.getElementById('checker-reset').addEventListener('click', reset);
-  select.addEventListener('change', reset);
-  reset();
+  document.getElementById('checker-run').addEventListener('click', () => {
+    control({ preset: state.preset, steps: done() ? 0 : state.steps, mode: 'run' });
+  });
+  document.getElementById('checker-reset').addEventListener('click', () => control({ preset: state.preset, steps: 0, mode: 'pause' }));
+  select.addEventListener('change', () => control({ preset: select.value, steps: 0, mode: 'pause' }));
+  apply(state);
+  return {
+    apply,
+    restore(saved, now) {
+      apply(saved || { preset: 'trap', steps: 0, mode: 'pause' }, saved ? Math.max(0, now - saved.stamp) : 0);
+    }
+  };
 }

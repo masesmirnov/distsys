@@ -512,19 +512,21 @@ function element(tag, className, html) {
 const ICON = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
 class Lab {
-  constructor(root, kind, source) {
+  constructor(root, kind, source, emit) {
     this.root = root;
     this.kind = kind;
     this.spec = SPECS[kind];
     this.source = source;
+    this.emit = emit;
     this.scenarioId = 'story';
+    this.seed = 1;
     this.playing = false;
     this.stepping = false;
     this.visible = false;
-    this.autoplayed = false;
     this.finished = false;
+    this.envelopeNodes = new Map();
     this.build();
-    this.reset();
+    this.seek(0);
   }
 
   build() {
@@ -574,14 +576,10 @@ class Lab {
 
     this.root.append(head, stage, this.caption, this.verdictBox, panes);
 
-    this.playButton.addEventListener('click', () => (this.playing && !this.stepping ? this.pause() : this.play()));
-    this.stepButton.addEventListener('click', () => this.step());
-    this.resetButton.addEventListener('click', () => this.reset());
-    this.select.addEventListener('change', () => {
-      this.scenarioId = this.select.value;
-      this.reset();
-      this.play();
-    });
+    this.playButton.addEventListener('click', () => this.control(this.playing && !this.stepping ? 'pause' : 'play'));
+    this.stepButton.addEventListener('click', () => this.control('step'));
+    this.resetButton.addEventListener('click', () => this.control('reset'));
+    this.select.addEventListener('change', () => this.control('play', this.select.value));
   }
 
   codePane(spec) {
@@ -609,45 +607,68 @@ class Lab {
     return { pane, rows };
   }
 
-  reset() {
-    const seed = Math.floor(Math.random() * 2 ** 31);
-    this.sim = new Simulation(this.spec, SCENARIOS[this.scenarioId], seed);
-    this.now = 0;
+  control(mode, scenario = this.scenarioId) {
+    const restart = mode === 'reset' || scenario !== this.scenarioId || (this.finished && mode !== 'pause');
+    const state = {
+      t: 'lab',
+      lab: this.kind,
+      mode,
+      scenario,
+      seed: restart ? (SCENARIOS[scenario].random ? Math.floor(Math.random() * 2 ** 31) : 1) : this.seed,
+      at: restart ? 0 : Math.round(this.now * 1000) / 1000
+    };
+    this.applyState(state);
+    this.emit(state);
+  }
+
+  applyState(state, elapsed = 0) {
+    this.scenarioId = state.scenario;
+    this.select.value = state.scenario;
+    this.seed = state.seed;
+    this.seek(state.mode === 'play' ? state.at + elapsed / UNIT_MS : state.at);
+    if (this.finished) return;
+    if (state.mode === 'play') this.play();
+    else if (state.mode === 'step') this.step();
+  }
+
+  seek(time) {
+    this.sim = new Simulation(this.spec, SCENARIOS[this.scenarioId], this.seed);
     this.playing = false;
     this.stepping = false;
     this.finished = false;
+    this.envelopeNodes.forEach(node => node.remove());
     this.envelopeNodes = new Map();
-    this.net.querySelectorAll('.env').forEach(node => node.remove());
     this.verdictBox.className = 'verdict';
     this.verdictBox.replaceChildren();
     this.previousVars = new Map();
     this.pendingSeen = null;
-    this.deliveredShown = 0;
+    let last = null;
+    for (;;) {
+      const next = this.sim.nextTime();
+      if (next === null || next > time || this.sim.time > TIME_LIMIT) break;
+      last = this.sim.step() || last;
+    }
+    this.now = Math.max(0, time);
+    this.deliveredShown = this.sim.delivered.length;
     this.renderNotes();
     this.renderState(true);
-    this.mark(null);
+    this.mark(last);
     for (const node of [this.senderBox, this.receiverBox]) node.classList.remove('active');
-    const intro = SCENARIOS[this.scenarioId].random ? `seed ${seed} · потери 30% · дубли 30% · задержка 1–3` : '—';
-    this.setCaption(0, intro);
+    const intro = SCENARIOS[this.scenarioId].random ? `seed ${this.seed} · потери 30% · дубли 30% · задержка 1–3` : '—';
+    if (last) this.setCaption(this.sim.time, last.note);
+    else this.setCaption(0, intro);
+    if (this.sim.done() && this.now >= this.sim.lastVisual) this.finish();
     this.updateButtons();
     this.draw();
   }
 
   play() {
-    if (this.finished) this.reset();
     this.playing = true;
     this.stepping = false;
     this.updateButtons();
   }
 
-  pause() {
-    this.playing = false;
-    this.stepping = false;
-    this.updateButtons();
-  }
-
   step() {
-    if (this.finished) this.reset();
     this.playing = true;
     this.stepping = true;
     this.updateButtons();
@@ -862,23 +883,17 @@ class Lab {
   }
 }
 
-export async function mountLabs() {
+export async function mountLabs(emit) {
   const roots = Array.from(document.querySelectorAll('[data-lab]'));
-  if (!roots.length) return [];
   const response = await fetch('data/guarantees.py');
   const source = (await response.text()).replace(/\r/g, '').split('\n');
-  const labs = roots.map(root => new Lab(root, root.dataset.lab, source));
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const labs = roots.map(root => new Lab(root, root.dataset.lab, source, emit));
   const observer = new IntersectionObserver(entries => {
     for (const entry of entries) {
       const lab = labs.find(item => item.root === entry.target);
       lab.visible = entry.isIntersecting;
-      if (entry.isIntersecting && entry.intersectionRatio > 0.35 && !lab.autoplayed && !reduced) {
-        lab.autoplayed = true;
-        lab.play();
-      }
     }
-  }, { threshold: [0, 0.35] });
+  });
   labs.forEach(lab => observer.observe(lab.root));
   let last = performance.now();
   const frame = now => {
@@ -892,5 +907,17 @@ export async function mountLabs() {
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
-  return labs;
+  return {
+    apply(state, elapsed) {
+      const lab = labs.find(item => item.kind === state.lab);
+      if (lab) lab.applyState(state, elapsed);
+    },
+    restore(states, now) {
+      for (const lab of labs) {
+        const state = states[lab.kind];
+        if (state) lab.applyState(state, Math.max(0, now - state.stamp));
+        else lab.applyState({ lab: lab.kind, mode: 'reset', scenario: 'story', seed: 1, at: 0 });
+      }
+    }
+  };
 }

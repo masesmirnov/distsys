@@ -52,7 +52,8 @@ function initials(name) {
 }
 
 class Board {
-  constructor() {
+  constructor(hooks) {
+    this.hooks = hooks;
     const params = new URLSearchParams(location.search);
     const room = (params.get('room') || 'main').toLowerCase();
     this.room = /^[a-z0-9-]{1,32}$/.test(room) ? room : 'main';
@@ -395,6 +396,7 @@ class Board {
     for (const peer of data.peers) {
       if (peer.cursor && peer.id !== this.me) this.moveCursor(peer.id, peer.cursor);
     }
+    this.hooks.restore(data.labs || {}, data.checker || null, data.now);
     if (this.queue.length) this.schedule(FLUSH_MS);
   }
 
@@ -467,6 +469,12 @@ class Board {
           break;
         case 'l':
           this.dropCursor(from);
+          break;
+        case 'lab':
+          this.hooks.lab(op);
+          break;
+        case 'checker':
+          this.hooks.checker(op);
           break;
         default:
           break;
@@ -708,6 +716,6 @@ export function toast(message) {
   toastTimer = setTimeout(() => node.classList.remove('shown'), 2600);
 }
 
-export function startBoard() {
-  return new Board();
+export function startBoard(hooks) {
+  return new Board(hooks);
 }

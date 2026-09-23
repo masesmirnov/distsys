@@ -39,6 +39,15 @@ async function loadResults() {
 setupTheme();
 setupNavigation();
 loadResults();
-mountChecker();
-mountLabs();
-startBoard();
+let board = null;
+const share = state => board && board.send(state);
+const checker = mountChecker(share);
+const labs = mountLabs(share);
+board = startBoard({
+  lab: state => labs.then(controller => controller.apply(state)),
+  checker: state => checker.apply(state),
+  restore: (states, saved, now) => {
+    labs.then(controller => controller.restore(states, now));
+    checker.restore(saved, now);
+  }
+});

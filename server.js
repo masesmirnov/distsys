@@ -30,6 +30,10 @@ const ADDRESS_OPS_LIMIT = 400;
 const RATE_KEYS_LIMIT = 20_000;
 const COORD_LIMIT = 200_000;
 const COLORS = 8;
+const LABS = new Set(['naive', 'amo', 'alo', 'eo', 'eoo']);
+const LAB_MODES = new Set(['play', 'pause', 'step', 'reset']);
+const SCENARIOS = new Set(['story', 'ideal', 'chaos']);
+const PRESETS = new Set(['trap', 'fair', 'swap']);
 const WIDTHS = [2, 4, 8, 14, 24];
 
 const TYPES = {
@@ -95,7 +99,7 @@ function roomOf(code) {
   if (!room) {
     if (rooms.size >= ROOM_LIMIT) evictIdleRoom();
     if (rooms.size >= ROOM_LIMIT) return null;
-    room = { peers: new Map(), strokes: new Map(), points: 0, cache: null, idleSince: Date.now() };
+    room = { peers: new Map(), strokes: new Map(), points: 0, cache: null, labs: {}, checker: null, idleSince: Date.now() };
     rooms.set(code, room);
   }
   room.idleSince = Date.now();
@@ -248,7 +252,7 @@ function openStream(req, res, url) {
   });
   res.write('retry: 2000\n\n');
   peer.streams.add(res);
-  const head = JSON.stringify({ you: peer.id, room: code, peers: peersOf(room, true) });
+  const head = JSON.stringify({ you: peer.id, room: code, peers: peersOf(room, true), labs: room.labs, checker: room.checker, now: Date.now() });
   deliver(res, chunkOf('hello', head.slice(0, -1) + ',"strokes":' + strokesJson(room) + '}'));
   broadcast(room, 'presence', { peers: peersOf(room) }, peer.id);
 
@@ -390,6 +394,20 @@ function apply(room, peer, op) {
     case 'l':
       peer.cursor = null;
       return { t: 'l' };
+    case 'lab': {
+      const at = Number(op.at);
+      if (!LABS.has(op.lab) || !LAB_MODES.has(op.mode) || !SCENARIOS.has(op.scenario)) return null;
+      if (!Number.isInteger(op.seed) || op.seed < 0 || op.seed >= 2 ** 31 || !Number.isFinite(at) || at < 0 || at > 1000) return null;
+      const state = { t: 'lab', lab: op.lab, mode: op.mode, scenario: op.scenario, seed: op.seed, at };
+      room.labs[op.lab] = { ...state, stamp: Date.now() };
+      return state;
+    }
+    case 'checker': {
+      if (!PRESETS.has(op.preset) || !['run', 'pause'].includes(op.mode) || !Number.isInteger(op.steps) || op.steps < 0 || op.steps > 50) return null;
+      const state = { t: 'checker', preset: op.preset, steps: op.steps, mode: op.mode };
+      room.checker = { ...state, stamp: Date.now() };
+      return state;
+    }
     case 'n':
       peer.name = cleanName(op.name);
       peer.color = cleanColor(op.c);
