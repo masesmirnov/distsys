@@ -1,0 +1,230 @@
+
+--- [AT MOST ONCE] NORMAL ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] NORMAL NON-UNIQUE ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DELAYED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] OLD DUPLICATE ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DROPPED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] OVERHEAD NORMAL ---
+
+100    Send Mem: 660      Recv Mem: 683      Messages: 100      Traffic: 12690    Throughput: 0.896
+500    Send Mem: 660      Recv Mem: 683      Messages: 500      Traffic: 63890    Throughput: 0.991
+1000   Send Mem: 660      Recv Mem: 683      Messages: 1000     Traffic: 127890   Throughput: 0.960
+
+PASSED
+
+
+--- [AT MOST ONCE] OVERHEAD FAULTY ---
+
+100    Send Mem: 660      Recv Mem: 1343     Messages: 100      Traffic: 12690    Throughput: 1.038
+500    Send Mem: 660      Recv Mem: 5483     Messages: 500      Traffic: 63890    Throughput: 1.030
+1000   Send Mem: 660      Recv Mem: 10595    Messages: 1000     Traffic: 127890   Throughput: 0.975
+
+PASSED
+
+
+--- [AT LEAST ONCE] NORMAL ---
+
+
+FAILED: Sender sent 10 messages, expected at most 5
+
+
+--- [AT LEAST ONCE] NORMAL NON-UNIQUE ---
+
+
+FAILED: Sender sent 20 messages, expected at most 10
+
+
+--- [AT LEAST ONCE] DELAYED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] DROPPED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] OVERHEAD NORMAL ---
+
+100    Send Mem: 1423     Recv Mem: 461      Messages: 400      Traffic: 28160    Throughput: 0.860
+
+FAILED: Message count > 200
+
+
+--- [AT LEAST ONCE] OVERHEAD FAULTY ---
+
+100    Send Mem: 2308     Recv Mem: 461      Messages: 639      Traffic: 46064    Throughput: 0.840
+
+FAILED: Message count > 500
+
+
+--- [EXACTLY ONCE] NORMAL ---
+
+
+FAILED: Sender sent 10 messages, expected at most 5
+
+
+--- [EXACTLY ONCE] NORMAL NON-UNIQUE ---
+
+
+FAILED: Sender sent 20 messages, expected at most 10
+
+
+--- [EXACTLY ONCE] DELAYED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] DROPPED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] OVERHEAD NORMAL ---
+
+100    Send Mem: 1423     Recv Mem: 683      Messages: 400      Traffic: 28160    Throughput: 0.860
+
+FAILED: Message count > 200
+
+
+--- [EXACTLY ONCE] OVERHEAD FAULTY ---
+
+100    Send Mem: 2308     Recv Mem: 811      Messages: 639      Traffic: 46064    Throughput: 0.840
+
+FAILED: Message count > 500
+
+
+--- [EXACTLY ONCE ORDERED] NORMAL ---
+
+
+FAILED: Sender sent 10 messages, expected at most 5
+
+
+--- [EXACTLY ONCE ORDERED] NORMAL NON-UNIQUE ---
+
+
+FAILED: Sender sent 20 messages, expected at most 10
+
+
+--- [EXACTLY ONCE ORDERED] DELAYED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] DROPPED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] OVERHEAD NORMAL ---
+
+100    Send Mem: 1423     Recv Mem: 667      Messages: 400      Traffic: 28160    Throughput: 0.860
+
+FAILED: Message count > 200
+
+
+--- [EXACTLY ONCE ORDERED] OVERHEAD FAULTY ---
+
+100    Send Mem: 2308     Recv Mem: 1132     Messages: 639      Traffic: 46064    Throughput: 0.840
+
+FAILED: Message count > 500
+
+-------------------------------------------------------------------------------
+
+Passed 21 from 33 tests
+
+Failed tests:
+- [AT LEAST ONCE] NORMAL: Sender sent 10 messages, expected at most 5
+- [AT LEAST ONCE] NORMAL NON-UNIQUE: Sender sent 20 messages, expected at most 10
+- [AT LEAST ONCE] OVERHEAD NORMAL: Message count > 200
+- [AT LEAST ONCE] OVERHEAD FAULTY: Message count > 500
+- [EXACTLY ONCE] NORMAL: Sender sent 10 messages, expected at most 5
+- [EXACTLY ONCE] NORMAL NON-UNIQUE: Sender sent 20 messages, expected at most 10
+- [EXACTLY ONCE] OVERHEAD NORMAL: Message count > 200
+- [EXACTLY ONCE] OVERHEAD FAULTY: Message count > 500
+- [EXACTLY ONCE ORDERED] NORMAL: Sender sent 10 messages, expected at most 5
+- [EXACTLY ONCE ORDERED] NORMAL NON-UNIQUE: Sender sent 20 messages, expected at most 10
+- [EXACTLY ONCE ORDERED] OVERHEAD NORMAL: Message count > 200
+- [EXACTLY ONCE ORDERED] OVERHEAD FAULTY: Message count > 500
+
+SCORE: 2
+

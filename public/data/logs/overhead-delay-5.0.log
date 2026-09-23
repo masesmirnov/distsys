@@ -1,0 +1,231 @@
+
+--- [AT MOST ONCE] NORMAL ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] NORMAL NON-UNIQUE ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DELAYED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] OLD DUPLICATE ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] DROPPED ---
+
+
+PASSED
+
+
+--- [AT MOST ONCE] OVERHEAD NORMAL ---
+
+100    Send Mem: 660      Recv Mem: 683      Messages: 100      Traffic: 12690    Throughput: 0.896
+500    Send Mem: 660      Recv Mem: 683      Messages: 500      Traffic: 63890    Throughput: 0.991
+1000   Send Mem: 660      Recv Mem: 683      Messages: 1000     Traffic: 127890   Throughput: 0.960
+
+PASSED
+
+
+--- [AT MOST ONCE] OVERHEAD FAULTY ---
+
+100    Send Mem: 660      Recv Mem: 1343     Messages: 100      Traffic: 12690    Throughput: 1.038
+500    Send Mem: 660      Recv Mem: 5483     Messages: 500      Traffic: 63890    Throughput: 1.030
+1000   Send Mem: 660      Recv Mem: 10595    Messages: 1000     Traffic: 127890   Throughput: 0.975
+
+PASSED
+
+
+--- [AT LEAST ONCE] NORMAL ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] NORMAL NON-UNIQUE ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] DELAYED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] DROPPED ---
+
+
+PASSED
+
+
+--- [AT LEAST ONCE] OVERHEAD NORMAL ---
+
+100    Send Mem: 1423     Recv Mem: 461      Messages: 200      Traffic: 14080    Throughput: 1.014
+500    Send Mem: 1777     Recv Mem: 461      Messages: 1000     Traffic: 71280    Throughput: 1.075
+1000   Send Mem: 1777     Recv Mem: 461      Messages: 2000     Traffic: 142780   Throughput: 0.996
+
+PASSED
+
+
+--- [AT LEAST ONCE] OVERHEAD FAULTY ---
+
+100    Send Mem: 3655     Recv Mem: 461      Messages: 380      Traffic: 26866    Throughput: 0.779
+500    Send Mem: 4363     Recv Mem: 461      Messages: 1906     Traffic: 134959   Throughput: 0.936
+1000   Send Mem: 3473     Recv Mem: 461      Messages: 3753     Traffic: 269127   Throughput: 0.955
+
+PASSED
+
+
+--- [EXACTLY ONCE] NORMAL ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] NORMAL NON-UNIQUE ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] DELAYED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] DROPPED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE] OVERHEAD NORMAL ---
+
+100    Send Mem: 1423     Recv Mem: 683      Messages: 200      Traffic: 14080    Throughput: 1.014
+500    Send Mem: 1777     Recv Mem: 683      Messages: 1000     Traffic: 71280    Throughput: 1.075
+1000   Send Mem: 1777     Recv Mem: 683      Messages: 2000     Traffic: 142780   Throughput: 0.996
+
+PASSED
+
+
+--- [EXACTLY ONCE] OVERHEAD FAULTY ---
+
+100    Send Mem: 3655     Recv Mem: 743      Messages: 380      Traffic: 26866    Throughput: 0.779
+500    Send Mem: 4363     Recv Mem: 827      Messages: 1906     Traffic: 134959   Throughput: 0.936
+1000   Send Mem: 3473     Recv Mem: 915      Messages: 3753     Traffic: 269127   Throughput: 0.955
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] NORMAL ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] NORMAL NON-UNIQUE ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] DELAYED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] DELAYED+DUPLICATED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] DROPPED ---
+
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] OVERHEAD NORMAL ---
+
+100    Send Mem: 1423     Recv Mem: 667      Messages: 200      Traffic: 14080    Throughput: 1.014
+500    Send Mem: 1777     Recv Mem: 667      Messages: 1000     Traffic: 71280    Throughput: 1.075
+1000   Send Mem: 1777     Recv Mem: 667      Messages: 2000     Traffic: 142780   Throughput: 0.996
+
+PASSED
+
+
+--- [EXACTLY ONCE ORDERED] OVERHEAD FAULTY ---
+
+100    Send Mem: 3655     Recv Mem: 1309     Messages: 380      Traffic: 26866    Throughput: 0.779
+500    Send Mem: 4363     Recv Mem: 3890     Messages: 1906     Traffic: 134959   Throughput: 0.936
+1000   Send Mem: 3473     Recv Mem: 4421     Messages: 3753     Traffic: 269127   Throughput: 0.955
+
+FAILED: Receiver memory > 4000
+
+-------------------------------------------------------------------------------
+
+Passed 32 from 33 tests
+
+Failed tests:
+- [EXACTLY ONCE ORDERED] OVERHEAD FAULTY: Receiver memory > 4000
+
+SCORE: 8
+
