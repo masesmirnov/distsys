@@ -46,9 +46,32 @@ function pathData(points) {
   return d + `L${points[points.length - 2]} ${points[points.length - 1]}`;
 }
 
+const ANIMALS = [
+  '🦦 Анонимная выдра', '🦔 Анонимный ёж', '🐼 Анонимная панда', '🐧 Анонимный пингвин', '🦊 Анонимная лиса',
+  '🦝 Анонимный енот', '🐨 Анонимная коала', '🦘 Анонимный кенгуру', '🦙 Анонимная лама', '🦒 Анонимный жираф',
+  '🐘 Анонимный слон', '🦛 Анонимный бегемот', '🐢 Анонимная черепаха', '🐸 Анонимная лягушка', '🦉 Анонимная сова',
+  '🐙 Анонимный осьминог', '🦩 Анонимный фламинго', '🦥 Анонимный ленивец', '🦨 Анонимный скунс', '🐬 Анонимный дельфин',
+  '🐳 Анонимный кит', '🦀 Анонимный краб', '🐝 Анонимная пчела', '🐺 Анонимный волк', '🐯 Анонимный тигр',
+  '🦓 Анонимная зебра', '🐪 Анонимный верблюд', '🐹 Анонимный хомяк', '🦜 Анонимный попугай', '🦚 Анонимный павлин',
+  '🦆 Анонимная утка', '🦖 Анонимный тираннозавр', '🦄 Анонимный единорог', '🐊 Анонимный крокодил', '🦑 Анонимный кальмар',
+  '🐌 Анонимная улитка'
+];
+
+const graphemes = new Intl.Segmenter('ru', { granularity: 'grapheme' });
+
+function animalName() {
+  return ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+}
+
 function initials(name) {
   const letters = name.trim().split(/\s+/).map(part => Array.from(part)[0] || '').join('');
   return (letters || '?').slice(0, 2).toUpperCase();
+}
+
+function avatarOf(name) {
+  const first = graphemes.segment(name.trim())[Symbol.iterator]().next().value;
+  if (first && /\p{Extended_Pictographic}/u.test(first.segment)) return { emoji: true, text: first.segment };
+  return { emoji: false, text: initials(name) };
 }
 
 class Board {
@@ -58,7 +81,11 @@ class Board {
     const room = (params.get('room') || 'main').toLowerCase();
     this.room = /^[a-z0-9-]{1,32}$/.test(room) ? room : 'main';
     this.cid = stored(sessionStorage, 'board-cid', () => randomId(16));
-    this.name = stored(localStorage, 'board-name', () => 'Гость ' + (10 + Math.floor(Math.random() * 90)));
+    this.name = stored(localStorage, 'board-name', animalName);
+    if (/^Гость \d+$/.test(this.name)) {
+      this.name = animalName();
+      save('board-name', this.name);
+    }
     this.color = Number(stored(localStorage, 'board-color', () => String(1 + Math.floor(Math.random() * 7))));
     this.penColor = Number(stored(localStorage, 'board-pen', () => '0'));
     this.penWidth = Number(stored(localStorage, 'board-width', () => '4'));
@@ -415,9 +442,10 @@ class Board {
     const ordered = [...peers].sort((a, b) => (b.id === this.me) - (a.id === this.me));
     for (const peer of ordered.slice(0, 4)) {
       const node = document.createElement('span');
-      node.className = 'peer' + (peer.id === this.me ? ' me' : '');
-      node.style.background = PALETTE[peer.color] || PALETTE[1];
-      node.textContent = initials(peer.name);
+      const avatar = avatarOf(peer.name);
+      node.className = 'peer' + (avatar.emoji ? ' animal' : '') + (peer.id === this.me ? ' me' : '');
+      node.style.setProperty('--pc', PALETTE[peer.color] || PALETTE[1]);
+      node.textContent = avatar.text;
       node.title = peer.id === this.me ? `${peer.name} (вы) — нажмите, чтобы переименоваться` : peer.name;
       if (peer.id === this.me) node.addEventListener('click', () => this.rename());
       holder.append(node);
@@ -438,7 +466,7 @@ class Board {
   rename() {
     const name = prompt('Как вас подписать для остальных?', this.name);
     if (!name || !name.trim()) return;
-    this.name = name.trim().slice(0, 24);
+    this.name = Array.from(name.trim()).slice(0, 24).join('');
     save('board-name', this.name);
     this.send({ t: 'n', name: this.name, c: this.color });
   }

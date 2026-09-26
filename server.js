@@ -190,7 +190,7 @@ function clip(value, limit) {
 }
 
 function cleanName(value) {
-  return clip(value, 24) || 'Гость';
+  return clip(value, 24) || 'Аноним';
 }
 
 function cleanColor(value) {
@@ -301,7 +301,7 @@ function openStream(req, res, url, site) {
     return;
   }
   if (!peer) {
-    peer = { cid, id: randomBytes(9).toString('base64url'), name: 'Гость', color: 0, streams: new Set(), lasers: new Map(), cursor: null };
+    peer = { cid, id: randomBytes(9).toString('base64url'), name: 'Аноним', color: 0, streams: new Set(), lasers: new Map(), cursor: null };
     room.peers.set(cid, peer);
   }
   peer.name = cleanName(url.searchParams.get('name'));

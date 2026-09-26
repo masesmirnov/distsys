@@ -148,6 +148,8 @@ button, select, input { font: inherit; color: inherit; }
   font-weight: 600;
 }
 .peer:first-child { margin-left: 0; }
+.peer { background: var(--pc); }
+.peer.animal { background: color-mix(in srgb, var(--pc) 24%, var(--surface)); box-shadow: inset 0 0 0 1.5px var(--pc); font-size: 15px; line-height: 1; }
 .peer.me { cursor: pointer; }
 .peer-more { background: var(--line-strong); color: var(--ink); }
 .status-dot { width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--faint); transition: background .3s; }
