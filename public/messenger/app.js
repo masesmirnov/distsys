@@ -3,6 +3,8 @@ import { startBoard, toast } from './board.js';
 import { mountChat } from './chat.js';
 import { highlight } from './code.js';
 import { setupNavigation, setupTheme } from './page.js';
+import { mark, markOnSight, markVerdicts, mountSketches } from './ink.js';
+import { SKETCHES } from './sketches.js';
 
 const PROTO = {
   keywords: new Set(['syntax', 'package', 'import', 'message', 'service', 'rpc', 'returns', 'stream']),
@@ -67,6 +69,7 @@ async function loadResults() {
       return card;
     }));
     document.querySelector('[data-value="image"]').textContent = results.image;
+    markOnSight(Array.from(document.querySelectorAll('.results-grid h3 .status')), 'circle');
   } catch {
     toast('Не удалось загрузить результаты тестов');
   }
@@ -91,3 +94,16 @@ board = startBoard({
   },
   events: { chat: data => chat.event(data) }
 });
+mountSketches(SKETCHES, {
+  top: 'messenger-hero',
+  chat: 'server',
+  proto: 'contract',
+  send: 'padlock',
+  subscribe: 'antenna',
+  flush: 'mailbox',
+  reconnect: 'plug',
+  results: 'trophy',
+  'board-section': 'pencil'
+});
+mark(document.querySelector('h1 .mark'), 'circle', 700);
+markVerdicts();

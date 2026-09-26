@@ -815,3 +815,21 @@ footer a { color: var(--muted); }
 .hero-links { display: flex; gap: 24px; margin: 28px 0 0; font-family: var(--mono); font-size: 15px; }
 .hero-links a { color: var(--muted); text-decoration: none; }
 .hero-links a:hover { color: var(--ink); }
+
+.chapter-head { position: relative; }
+.hero .wrap { position: relative; }
+.sketch { position: absolute; right: 0; bottom: calc(100% - 28px); width: 150px; height: 112px; overflow: visible; pointer-events: none; }
+.hero-sketch { position: relative; right: auto; bottom: auto; display: block; width: min(560px, 100%); height: auto; aspect-ratio: 13 / 8; margin: -28px 0 -44px auto; }
+.sketch path, .mark-ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.mark { position: relative; white-space: nowrap; }
+svg.mark-ink { position: absolute; overflow: visible; pointer-events: none; }
+svg.mark-ink.circle { left: -10%; top: -16%; width: 120%; height: 132%; }
+svg.mark-ink.underline { left: -2%; bottom: -0.1em; width: 104%; height: 0.28em; }
+svg.mark-ink.ok, svg.mark-ink.zigzag { left: 0; bottom: -9px; width: 100%; height: 12px; }
+.status > svg.mark-ink.circle { left: -34%; top: -48%; width: 168%; height: 196%; }
+.verdict > span, .results-grid .status { position: relative; }
+
+@media (max-width: 760px) {
+  .sketch { width: 88px; height: 66px; bottom: 100%; }
+  .hero-sketch { width: 100%; height: auto; margin: 12px 0 -24px auto; }
+}

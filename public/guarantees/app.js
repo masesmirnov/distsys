@@ -3,6 +3,8 @@ import { startBoard, toast } from './board.js';
 import { renderResults } from './charts.js';
 import { mountChecker } from './checker.js';
 import { setupNavigation, setupTheme } from './page.js';
+import { mark, markVerdicts, mountSketches } from './ink.js';
+import { SKETCHES } from './sketches.js';
 
 async function loadResults() {
   try {
@@ -28,3 +30,17 @@ board = startBoard({
     checker.restore(data.checker || null, data.now);
   }
 });
+mountSketches(SKETCHES, {
+  top: 'airmail-hero',
+  model: 'storm',
+  amo: 'once',
+  alo: 'retry',
+  eo: 'stamp',
+  eoo: 'ordered',
+  resources: 'gauge',
+  bug: 'bug',
+  results: 'trophy',
+  'board-section': 'pencil'
+});
+mark(document.querySelector('h1 .mark'), 'underline', 700);
+markVerdicts();
