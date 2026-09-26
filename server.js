@@ -161,7 +161,7 @@ function roomOf(site, code) {
     const limited = code !== 'main';
     if (limited && rooms.size >= ROOM_LIMIT) evictIdleRoom();
     if (limited && rooms.size >= ROOM_LIMIT) return null;
-    room = { site, code, peers: new Map(), strokes: new Map(), points: 0, cache: null, labs: {}, checker: null, idleSince: Date.now() };
+    room = { site, code, peers: new Map(), strokes: new Map(), points: 0, cache: null, labs: {}, checker: null, seq: 0, idleSince: Date.now() };
     rooms.set(key, room);
   }
   room.idleSince = Date.now();
@@ -469,13 +469,13 @@ function apply(room, peer, op) {
       if (!Number.isInteger(op.seed) || op.seed < 0 || op.seed >= 2 ** 31 || !Number.isFinite(at) || at < 0 || at > 1000) return null;
       const speed = op.speed === undefined ? 1 : Number(op.speed);
       if (!Number.isFinite(speed) || speed < 0 || speed > 1) return null;
-      const state = { t: 'lab', lab: op.lab, mode: op.mode, scenario: op.scenario, seed: op.seed, at, speed: Math.round(speed * 100) / 100 };
+      const state = { t: 'lab', lab: op.lab, mode: op.mode, scenario: op.scenario, seed: op.seed, at, speed: Math.round(speed * 100) / 100, seq: ++room.seq };
       room.labs[op.lab] = { ...state, stamp: Date.now() };
       return state;
     }
     case 'checker': {
       if (!SITES.get(room.site).presets.has(op.preset) || !['run', 'pause'].includes(op.mode) || !Number.isInteger(op.steps) || op.steps < 0 || op.steps > 50) return null;
-      const state = { t: 'checker', preset: op.preset, steps: op.steps, mode: op.mode };
+      const state = { t: 'checker', preset: op.preset, steps: op.steps, mode: op.mode, seq: ++room.seq };
       room.checker = { ...state, stamp: Date.now() };
       return state;
     }
@@ -521,15 +521,18 @@ async function handleOps(req, res, url, site) {
     return;
   }
   const accepted = [];
+  const ordered = [];
   let presence = false;
   for (const op of payload.slice(0, OPS_PER_REQUEST)) {
     const result = apply(room, peer, op);
     if (!result) continue;
     if (result.t === 'n') presence = true;
+    else if (result.seq) ordered.push(result);
     else accepted.push(result);
   }
   room.idleSince = Date.now();
   if (accepted.length) broadcast(room, 'ops', { from: peer.id, ops: accepted }, peer.id);
+  if (ordered.length) broadcast(room, 'ops', { from: peer.id, ops: ordered });
   if (presence) broadcast(room, 'presence', { peers: peersOf(room) });
   json(res, 200, { ok: true, full: room.points >= ROOM_POINT_LIMIT || room.strokes.size >= STROKE_LIMIT });
 }

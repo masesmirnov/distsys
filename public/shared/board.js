@@ -70,6 +70,8 @@ class Board {
     this.peers = [];
     this.cursors = new Map();
     this.queue = [];
+    this.seqs = new Map();
+    this.pending = new Map();
     this.flushTimer = 0;
     this.lastCursor = 0;
     this.cursorTimer = 0;
@@ -317,6 +319,10 @@ class Board {
   }
 
   send(op) {
+    if (op.t === 'lab' || op.t === 'checker') {
+      const key = op.lab || op.t;
+      this.pending.set(key, (this.pending.get(key) || 0) + 1);
+    }
     this.queue.push(op);
     if (this.queue.length > 2000) this.queue.splice(0, this.queue.length - 2000);
     this.schedule(FLUSH_MS);
@@ -396,6 +402,8 @@ class Board {
     for (const peer of data.peers) {
       if (peer.cursor && peer.id !== this.me) this.moveCursor(peer.id, peer.cursor);
     }
+    this.seqs = new Map([...Object.values(data.labs), data.checker].filter(Boolean).map(state => [state.lab || state.t, state.seq]));
+    this.pending.clear();
     this.hooks.restore(data);
     if (this.queue.length) this.schedule(FLUSH_MS);
   }
@@ -471,15 +479,28 @@ class Board {
           this.dropCursor(from);
           break;
         case 'lab':
-          this.hooks.lab(op);
+          if (this.newer(op, from)) this.hooks.lab(op);
           break;
         case 'checker':
-          this.hooks.checker(op);
+          if (this.newer(op, from)) this.hooks.checker(op);
           break;
         default:
           break;
       }
     }
+  }
+
+  newer(op, from) {
+    const key = op.lab || op.t;
+    if (op.seq <= (this.seqs.get(key) || 0)) return false;
+    this.seqs.set(key, op.seq);
+    const pending = this.pending.get(key) || 0;
+    if (from === this.me && pending) {
+      this.pending.set(key, pending - 1);
+      return false;
+    }
+    this.pending.delete(key);
+    return true;
   }
 
   moveCursor(id, op) {
