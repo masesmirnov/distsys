@@ -140,9 +140,8 @@ const chatBursts = new Map();
 const chat = {
   clients: CHAT_CLIENTS.map(address => {
     const [host, port] = address.split(':');
-    return { host, port: Number(port), log: [], online: false, queue: Promise.resolve(), waiting: 0, polling: false, again: false };
-  }),
-  stamps: []
+    return { host, port: Number(port), online: false, queue: Promise.resolve(), waiting: 0, polling: false, again: false };
+  })
 };
 
 function siteOf(req) {
@@ -553,9 +552,7 @@ function chatMessage(raw) {
 function chatSnapshot() {
   return {
     ports: chat.clients.map(client => client.port),
-    online: chat.clients.map(client => client.online),
-    logs: chat.clients.map(client => client.log),
-    stamps: chat.stamps
+    online: chat.clients.map(client => client.online)
   };
 }
 
@@ -640,7 +637,6 @@ function pollClient(client, index) {
     .then(answer => {
       if (!Array.isArray(answer) || !answer.length) return;
       const messages = answer.slice(-CHAT_LOG_LIMIT).map(chatMessage);
-      client.log = client.log.concat(messages).slice(-CHAT_LOG_LIMIT);
       chatBroadcast({ t: 'got', c: index, m: messages });
     }, () => {})
     .finally(() => {
@@ -658,10 +654,7 @@ function pollChat() {
 
 async function sendChat(index, author, text) {
   const answer = await clientRequest(chat.clients[index], '/sendMessage', asciiJson({ author, text }));
-  const stamp = { c: index, author, text, sendTime: timestamp(answer && answer.sendTime) };
-  chat.stamps = chat.stamps.concat(stamp).slice(-CHAT_LOG_LIMIT);
-  chatBroadcast({ t: 'sent', ...stamp });
-  return stamp;
+  chatBroadcast({ t: 'sent', c: index, author, text, sendTime: timestamp(answer && answer.sendTime) });
 }
 
 async function handleChat(req, res, url, site) {
@@ -686,6 +679,15 @@ async function handleChat(req, res, url, site) {
     payload = JSON.parse(await readBody(req));
   } catch {
     json(res, 400, { error: 'плохой запрос' });
+    return;
+  }
+  if (payload && payload.clear === true) {
+    if (!hit(chatPeers, cid, CHAT_PEER_WINDOW, CHAT_PEER_LIMIT) || !hit(chatAddresses, addressOf(req), CHAT_WINDOW, CHAT_ADDRESS_LIMIT)) {
+      json(res, 429, { error: 'слишком часто' });
+      return;
+    }
+    chatBroadcast({ t: 'clear' });
+    json(res, 200, { ok: true });
     return;
   }
   const burst = Boolean(payload && payload.burst === true);

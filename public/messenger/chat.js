@@ -10,15 +10,16 @@ function nanos(value) {
 function row(message, fresh, from) {
   const item = document.createElement('li');
   if (fresh) item.className = 'fresh';
+  const meta = document.createElement('div');
+  meta.className = 'meta';
   const time = document.createElement('time');
   time.textContent = nanos(message.sendTime).slice(11) || '—';
-  const author = document.createElement('b');
-  author.textContent = message.author;
+  meta.append(time);
+  if (from !== undefined) meta.append(Object.assign(document.createElement('i'), { className: `from c${from}`, textContent: `клиент ${from + 1}` }));
+  else meta.append(Object.assign(document.createElement('b'), { textContent: message.author }));
   const text = document.createElement('span');
   text.textContent = message.text;
-  item.append(time);
-  if (from !== undefined) item.append(Object.assign(document.createElement('i'), { className: `from c${from}`, textContent: from + 1 }));
-  item.append(author, text);
+  item.append(meta, text);
   return item;
 }
 
@@ -36,6 +37,7 @@ export function mountChat(board) {
   const wires = Array.from(root.querySelectorAll('[data-wire]'));
   const check = document.getElementById('chat-check');
   const burst = document.getElementById('chat-burst');
+  const clear = document.getElementById('chat-clear');
   const state = { ports: [], online: [], logs: [[], []], stamps: [] };
 
   const renderLog = (index, fresh) => {
@@ -86,6 +88,7 @@ export function mountChat(board) {
       });
     });
     burst.disabled = !state.ports.length || !state.online.every(Boolean);
+    clear.disabled = !state.ports.length;
     renderCheck();
   };
 
@@ -122,22 +125,26 @@ export function mountChat(board) {
     });
   });
   burst.addEventListener('click', () => post({ burst: true }));
+  clear.addEventListener('click', () => post({ clear: true }));
 
   return {
     restore(snapshot) {
       const known = Boolean(snapshot && snapshot.ports.length === columns.length);
       state.ports = known ? snapshot.ports : [];
       state.online = known ? snapshot.online : [];
-      state.logs = columns.map((column, index) => (known ? snapshot.logs[index].slice(-LIMIT) : []));
-      state.stamps = known ? snapshot.stamps.slice(-LIMIT) : [];
-      state.logs.forEach((log, index) => renderLog(index, 0));
-      renderStamps([]);
       renderState();
     },
     event(data) {
       if (data.t === 'status') {
         state.online = data.online;
         renderState();
+      } else if (data.t === 'clear') {
+        state.logs = columns.map(() => []);
+        state.stamps = [];
+        state.logs.forEach((log, index) => renderLog(index, 0));
+        renderStamps([]);
+        renderCheck();
+        toast('Чат очистили');
       } else if (data.t === 'sent') {
         const stamp = { c: data.c, author: data.author, text: data.text, sendTime: data.sendTime };
         state.stamps = state.stamps.concat(stamp).slice(-LIMIT);
