@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Гарантии доставки</title>
+<meta name="description" content="AMO, ALO, EO и EOO в живой симуляции поверх настоящего кода решения.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script src="theme.js"></script>
+<script type="module" src="app.js"></script>
+</head>
+<body>
+
+<svg class="sr-only" aria-hidden="true" focusable="false">
+  <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="5" height="10" rx="1.5"/><rect x="16.5" y="7" width="5" height="10" rx="1.5"/><path d="M8.5 10h7m-2-2 2 2-2 2M15.5 14h-7m2 2-2-2 2-2"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3"/><path d="m13.5 7.5 3 3"/></symbol>
+  <symbol id="i-laser" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20H8.5l-4.2-4.3a1 1 0 0 1 0-1.4l9.8-9.8a1 1 0 0 1 1.4 0l4.2 4.2a1 1 0 0 1 0 1.4L11 18.8"/><path d="m18 12.3-6.3-6.3"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 15 6-6"/><path d="m11 6 .5-.5a4 4 0 0 1 5.7 5.7l-.5.5M13 18l-.5.5a4 4 0 0 1-5.7-5.7l.5-.5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
+  <symbol id="i-step" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v14"/><path d="M9 5.5v13l10-6.5z"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-cursor" viewBox="0 0 24 24"><path d="M4 2.5 10.2 20l2.6-7.2L20 10.2z" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <a class="brand" href="#top"><svg aria-hidden="true"><use href="#i-logo"/></svg><span>Гарантии доставки</span></a>
+    <nav class="nav" aria-label="Разделы">
+      <a href="#model">Без протокола</a>
+      <a href="#amo">AMO</a>
+      <a href="#alo">ALO</a>
+      <a href="#eo">EO</a>
+      <a href="#eoo">EOO</a>
+      <a href="#resources">Ресурсы</a>
+      <a href="#bug">Баг</a>
+      <a href="#results">Тесты</a>
+      <a href="#board">Доска</a>
+    </nav>
+    <div class="bar-tools">
+      <div class="peers" id="peers" aria-label="Кто сейчас на странице"></div>
+      <button class="chip-button" id="draw-toggle" type="button" aria-pressed="false" title="Рисовать поверх страницы — видят все, кто открыл ссылку (D)">
+        <svg aria-hidden="true"><use href="#i-pen"/></svg><span class="label-text">Рисовать</span>
+      </button>
+      <button class="icon-button" id="theme-toggle" type="button" aria-label="Сменить тему">
+        <svg class="theme-light-only" aria-hidden="true"><use href="#i-sun"/></svg>
+        <svg class="theme-dark-only" aria-hidden="true"><use href="#i-moon"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="chapter hero" id="top" data-anchor="hero">
+  <div class="wrap">
+    <p class="eyebrow">ДЗ 1 · распределённые системы</p>
+    <h1>Гарантии доставки</h1>
+    <p class="hero-links"><a href="#amo">AMO</a><a href="#alo">ALO</a><a href="#eo">EO</a><a href="#eoo">EOO</a></p>
+  </div>
+</section>
+
+<section class="chapter" id="model" data-anchor="model">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">00</span>без протокола</p>
+      <h2>Просто переслать</h2>
+      <div class="rule"><span>потери 30%</span><span>дубли 30%</span><span>задержка 1–3</span></div>
+    </div>
+    <div class="lab" data-lab="naive"></div>
+  </div>
+</section>
+
+<section class="chapter" id="amo" data-anchor="amo">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">01</span>at most once</p>
+      <h2>Не более одного раза</h2>
+      <div class="rule"><span class="no">повтор</span><span class="yes">потеря</span></div>
+    </div>
+    <div class="lab" data-lab="amo"></div>
+  </div>
+</section>
+
+<section class="chapter" id="alo" data-anchor="alo">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">02</span>at least once</p>
+      <h2>Не менее одного раза</h2>
+      <div class="rule"><span class="no">потеря</span><span class="yes">повтор</span></div>
+    </div>
+    <div class="lab" data-lab="alo"></div>
+  </div>
+</section>
+
+<section class="chapter" id="eo" data-anchor="eo">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">03</span>exactly once</p>
+      <h2>Ровно один раз</h2>
+      <div class="rule"><span class="no">потеря</span><span class="no">повтор</span></div>
+    </div>
+    <div class="lab" data-lab="eo"></div>
+  </div>
+</section>
+
+<section class="chapter" id="eoo" data-anchor="eoo">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">04</span>exactly once + ordered</p>
+      <h2>Ровно один раз по порядку</h2>
+      <div class="rule"><span class="no">потеря</span><span class="no">повтор</span><span class="no">перестановка</span></div>
+    </div>
+    <div class="lab" data-lab="eoo"></div>
+  </div>
+</section>
+
+<section class="chapter" id="resources" data-anchor="resources">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">05</span>память и сеть</p>
+      <h2>Ресурсы</h2>
+    </div>
+
+    <div class="block">
+      <h3>Где помнить доставленное <span class="h-note">память Receiver AMO, сеть с отказами</span></h3>
+      <div class="grid-2">
+        <div class="card chart" id="chart-storage-100"></div>
+        <div class="card chart" id="chart-storage-1000"></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3><code>RESEND_DELAY</code> <span class="h-note">прогоны тестов с разными значениями</span></h3>
+      <div class="card table-card" id="delay-table"></div>
+    </div>
+
+    <div class="block">
+      <h3>Запас до лимитов <span class="h-note">худший прогон, сеть с отказами</span></h3>
+      <div class="grid-2" id="meters"></div>
+      <details class="table-view">
+        <summary>Все замеры</summary>
+        <div class="card table-card" id="overhead-table"></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="bug" data-anchor="bug">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">06</span>tests/src/common.rs</p>
+      <h2>Баг в проверке порядка</h2>
+    </div>
+
+    <div class="grid-2 block">
+      <div>
+        <div class="code-label">check_message_delivery_ordered · фикс</div>
+<pre class="diff" aria-label="Исправление"><span class="ln">let mut next_idx = 0;</span><span class="ln">for i in 0..delivered.len() {</span><span class="ln">    let msg = &amp;delivered[i];</span><span class="ln">    let mut matched = false;</span><span class="ln">    while !matched &amp;&amp; next_idx &lt; sent.len() {</span><span class="ln">        if msg.data == sent[next_idx].data {</span><span class="ln">            matched = true;</span><span class="ln add">+           next_idx += 1;</span><span class="ln">        } else {</span><span class="ln">            next_idx += 1;</span><span class="ln">        }</span><span class="ln">    }</span><span class="ln">    assume!(matched, "Order violation: …")?;</span><span class="ln">}</span></pre>
+      </div>
+      <div>
+        <div class="code-label">тест, который ловит</div>
+<pre class="diff"><span class="ln">let sent = [m("X"), m("Y"), m("X")];</span><span class="ln">let delivered = [m("X"), m("X"), m("Y")];</span><span class="ln"> </span><span class="ln">assert!(check_message_delivery_ordered(</span><span class="ln">    &amp;delivered, &amp;sent,</span><span class="ln">).is_err());</span></pre>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="checker-controls">
+        <select id="checker-preset" aria-label="Пример">
+          <option value="trap">X Y X → X X Y</option>
+          <option value="fair">X Y X → X Y X</option>
+          <option value="swap">A B C → B A C</option>
+        </select>
+        <button class="chip-button" id="checker-step" type="button"><svg aria-hidden="true"><use href="#i-step"/></svg><span>Шаг</span></button>
+        <button class="chip-button" id="checker-run" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg><span>До конца</span></button>
+        <button class="icon-button" id="checker-reset" type="button" aria-label="Заново" title="Заново"><svg aria-hidden="true"><use href="#i-reset"/></svg></button>
+      </div>
+      <div class="checker">
+        <div class="card" data-checker="original"></div>
+        <div class="card" data-checker="fixed"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="results" data-anchor="results">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">07</span><code>-m 100 -c -o</code></p>
+      <h2>Официальный прогон</h2>
+    </div>
+    <div class="tests-grid" id="tests-grid"></div>
+    <p class="fine"><a href="data/logs/full-4.0.log">лог прогона</a> · <span data-value="image"></span></p>
+  </div>
+</section>
+
+<section class="chapter" id="board-section" data-cursor="board-area">
+  <div class="wrap">
+    <div class="chapter-head">
+      <p class="eyebrow"><span class="tag">08</span>видят все, кто открыл ссылку</p>
+      <h2 id="board">Доска</h2>
+    </div>
+    <div class="board-wrap">
+      <div class="board" data-anchor="board"></div>
+    </div>
+    <p class="fine" id="room-line"></p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <nav aria-label="Материалы">
+      <a href="data/guarantees.py">guarantees.py</a>
+      <a href="data/logs/full-4.0.log">лог прогона</a>
+      <a href="data/results.json">замеры</a>
+      <a href="https://messenger.maserov.com">ДЗ 2 · мессенджер</a>
+    </nav>
+  </div>
+</footer>
+
+<div class="dock" id="dock" aria-label="Инструменты рисования">
+  <button class="tool" type="button" data-tool="pen" aria-pressed="true" title="Перо (P)"><svg aria-hidden="true"><use href="#i-pen"/></svg></button>
+  <button class="tool" type="button" data-tool="laser" aria-pressed="false" title="Указка: след исчезает сам (L)"><svg aria-hidden="true"><use href="#i-laser"/></svg></button>
+  <button class="tool" type="button" data-tool="eraser" aria-pressed="false" title="Ластик (E)"><svg aria-hidden="true"><use href="#i-eraser"/></svg></button>
+  <span class="sep"></span>
+  <span id="swatches" class="dock-group"></span>
+  <span class="sep"></span>
+  <span id="widths" class="dock-group"></span>
+  <span class="sep"></span>
+  <button class="tool" type="button" id="undo" title="Отменить мой последний штрих (Ctrl+Z)"><svg aria-hidden="true"><use href="#i-undo"/></svg></button>
+  <button class="tool" type="button" id="clear" title="Стереть всё"><svg aria-hidden="true"><use href="#i-trash"/></svg></button>
+  <button class="tool" type="button" id="share" title="Скопировать ссылку на комнату"><svg aria-hidden="true"><use href="#i-link"/></svg></button>
+  <span class="dock-note" id="dock-note"></span>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tooltip" id="tooltip" role="tooltip"></div>
+
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+ "image": "distsys.ru/course/grpc-messenger@sha256:19b3d8d71ee6f04237e810ecfa20607146a779ca94ed0fdea30b0bf08b25ea62",
+ "score": 10,
+ "components": [
+  {
+   "name": "proto",
+   "score": 2,
+   "max": 2,
+   "tests": [
+    {
+     "name": "test_proto_contract",
+     "status": "PASSED"
+    }
+   ]
+  },
+  {
+   "name": "server",
+   "score": 4,
+   "max": 4,
+   "tests": [
+    {
+     "name": "test_send_smoke",
+     "status": "PASSED"
+    },
+    {
+     "name": "test_send_returns_ascending_time",
+     "status": "PASSED"
+    },
+    {
+     "name": "test_get_messages_smoke",
+     "status": "PASSED"
+    },
+    {
+     "name": "test_get_only_sends_new",
+     "status": "PASSED"
+    }
+   ]
+  },
+  {
+   "name": "client",
+   "score": 4,
+   "max": 4,
+   "tests": [
+    {
+     "name": "test_single_client_single_message",
+     "status": "PASSED"
+    },
+    {
+     "name": "test_single_client_multiple_messages",
+     "status": "PASSED"
+    },
+    {
+     "name": "test_two_clients_multiple_messages",
+     "status": "PASSED"
+    }
+   ]
+  }
+ ]
+}

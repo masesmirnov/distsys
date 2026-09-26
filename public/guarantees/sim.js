@@ -1,3 +1,5 @@
+import { ICON, element, highlight } from './code.js';
+
 const RESEND_DELAY = 4.0;
 const UNIT_MS = 780;
 const LOST_AT = 0.5;
@@ -474,42 +476,11 @@ class Simulation {
   }
 }
 
-function escapeHtml(text) {
-  return text.replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
-}
-
-const KEYWORDS = new Set(['class', 'def', 'if', 'else', 'return', 'while', 'pass', 'in', 'not', 'and', 'or', 'is', 'None', 'from', 'import', 'del', 'self']);
-const BUILTINS = new Set(['range', 'len', 'int', 'str', 'array', 'bisect_left', 'Message', 'Process', 'Context']);
-
-function highlight(line) {
-  const tokens = /("[^"]*"|'[^']*'|\b\d+(?:\.\d+)?\b|\b[A-Za-z_][A-Za-z0-9_]*\b)/g;
-  let html = '';
-  let last = 0;
-  let previous = '';
-  for (const match of line.matchAll(tokens)) {
-    html += escapeHtml(line.slice(last, match.index));
-    const token = match[0];
-    let kind = null;
-    if (token[0] === '"' || token[0] === "'") kind = 'tok-s';
-    else if (/^\d/.test(token)) kind = 'tok-n';
-    else if (KEYWORDS.has(token)) kind = 'tok-k';
-    else if (previous === 'def' || previous === 'class') kind = 'tok-f';
-    else if (BUILTINS.has(token)) kind = 'tok-b';
-    html += kind ? `<span class="${kind}">${escapeHtml(token)}</span>` : escapeHtml(token);
-    if (/^[A-Za-z_]/.test(token)) previous = token;
-    last = match.index + token.length;
-  }
-  return html + escapeHtml(line.slice(last));
-}
-
-function element(tag, className, html) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (html !== undefined) node.innerHTML = html;
-  return node;
-}
-
-const ICON = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const PYTHON = {
+  keywords: new Set(['class', 'def', 'if', 'else', 'return', 'while', 'pass', 'in', 'not', 'and', 'or', 'is', 'None', 'from', 'import', 'del', 'self']),
+  builtins: new Set(['range', 'len', 'int', 'str', 'array', 'bisect_left', 'Message', 'Process', 'Context']),
+  definers: new Set(['def', 'class'])
+};
 
 class Lab {
   constructor(root, kind, source, emit) {
@@ -614,7 +585,7 @@ class Lab {
       : this.source.slice(spec.range[0] - 1, spec.range[1]).map((text, index) => [spec.range[0] + index, text]);
     const idle = text => /^\s*pass\s*$/.test(text || '');
     lines.forEach(([number, text], index) => {
-      const row = element('span', 'ln', `<span class="no">${number}</span><span class="src">${highlight(text) || ' '}</span>`);
+      const row = element('span', 'ln', `<span class="no">${number}</span><span class="src">${highlight(text, PYTHON) || ' '}</span>`);
       if (tags[number]) row.append(element('span', 'tag', tags[number]));
       const next = lines[index + 1];
       if (idle(text) || (/^\s+def /.test(text) && next && idle(next[1]))) row.classList.add('dim');

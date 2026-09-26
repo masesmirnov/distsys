@@ -368,6 +368,9 @@ class Board {
     source.addEventListener('hello', event => this.hello(JSON.parse(event.data)));
     source.addEventListener('presence', event => this.presence(JSON.parse(event.data).peers));
     source.addEventListener('ops', event => this.remote(JSON.parse(event.data)));
+    for (const [name, handler] of Object.entries(this.hooks.events || {})) {
+      source.addEventListener(name, event => handler(JSON.parse(event.data)));
+    }
     source.addEventListener('error', () => {
       this.setOnline(false);
       if (source !== this.source || source.readyState !== EventSource.CLOSED) return;
@@ -393,7 +396,7 @@ class Board {
     for (const peer of data.peers) {
       if (peer.cursor && peer.id !== this.me) this.moveCursor(peer.id, peer.cursor);
     }
-    this.hooks.restore(data.labs || {}, data.checker || null, data.now);
+    this.hooks.restore(data);
     if (this.queue.length) this.schedule(FLUSH_MS);
   }
 

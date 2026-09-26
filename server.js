@@ -9,6 +9,7 @@ const { createHash, randomBytes } = require('node:crypto');
 const PORT = Number(process.env.PORT) || 8094;
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC = path.join(__dirname, 'public');
+const CHAT_CLIENTS = (process.env.MESSENGER_CLIENTS || '').split(',').map(value => value.trim()).filter(Boolean);
 
 const BODY_LIMIT = 64 * 1024;
 const BACKLOG_LIMIT = 256 * 1024;
@@ -30,11 +31,45 @@ const ADDRESS_OPS_LIMIT = 400;
 const RATE_KEYS_LIMIT = 20_000;
 const COORD_LIMIT = 200_000;
 const COLORS = 8;
-const LABS = new Set(['naive', 'amo', 'alo', 'eo', 'eoo']);
 const LAB_MODES = new Set(['play', 'pause', 'step', 'reset']);
-const SCENARIOS = new Set(['story', 'ideal', 'chaos']);
-const PRESETS = new Set(['trap', 'fair', 'swap']);
 const WIDTHS = [2, 4, 8, 14, 24];
+const CHAT_CLIENT_COUNT = 2;
+const CHAT_LOG_LIMIT = 40;
+const CHAT_TEXT_LIMIT = 200;
+const CHAT_AUTHOR_LIMIT = 40;
+const CHAT_RESPONSE_LIMIT = 1024 * 1024;
+const CHAT_POLL_MS = 900;
+const CHAT_SLOW_MS = 4000;
+const CHAT_DEADLINE_MS = 120_000;
+const CHAT_QUEUE_LIMIT = 4;
+const CHAT_PEER_WINDOW = 1000;
+const CHAT_PEER_LIMIT = 2;
+const CHAT_WINDOW = 60_000;
+const CHAT_ADDRESS_LIMIT = 30;
+const CHAT_GLOBAL_WINDOW = 1000;
+const CHAT_GLOBAL_LIMIT = 8;
+const BURST_WINDOW = 6000;
+const BURST_TEXTS = [['A1', 'A2', 'A3'], ['B1', 'B2', 'B3']];
+
+if (CHAT_CLIENTS.length && (CHAT_CLIENTS.length !== CHAT_CLIENT_COUNT || !CHAT_CLIENTS.every(value => /^[A-Za-z0-9.-]+:\d{1,5}$/.test(value)))) {
+  throw new Error('MESSENGER_CLIENTS: нужны два адреса host:port через запятую');
+}
+
+const SITES = new Map([
+  ['guarantees', {
+    labs: new Set(['naive', 'amo', 'alo', 'eo', 'eoo']),
+    scenarios: new Set(['story', 'ideal', 'chaos']),
+    presets: new Set(['trap', 'fair', 'swap']),
+    chat: false
+  }],
+  ['messenger', {
+    labs: new Set(['send', 'subscribe', 'flush', 'reconnect']),
+    scenarios: new Set(['ok', 'nolock', 'outside', 'noretry']),
+    presets: new Set(),
+    chat: true
+  }]
+]);
+const DEFAULT_SITE = 'guarantees';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -43,6 +78,7 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.py': 'text/plain; charset=utf-8',
+  '.proto': 'text/plain; charset=utf-8',
   '.log': 'text/plain; charset=utf-8'
 };
 
@@ -85,22 +121,48 @@ function collectAssets(directory, prefix = '') {
   return found;
 }
 
-const assets = collectAssets(PUBLIC);
-assets.set('/', assets.get('/index.html'));
+const shared = collectAssets(path.join(PUBLIC, 'shared'));
+const assets = new Map(Array.from(SITES.keys(), site => {
+  const own = collectAssets(path.join(PUBLIC, site));
+  own.set('/', own.get('/index.html'));
+  return [site, new Map([...shared, ...own])];
+}));
 
 const rooms = new Map();
 const streams = new Map();
 const opens = new Map();
 const addressOps = new Map();
 const peerOps = new Map();
+const chatPeers = new Map();
+const chatAddresses = new Map();
+const chatGlobal = new Map();
+const chatBursts = new Map();
+const chat = {
+  clients: CHAT_CLIENTS.map(address => {
+    const [host, port] = address.split(':');
+    return { host, port: Number(port), log: [], online: false, queue: Promise.resolve(), waiting: 0, polling: false, again: false };
+  }),
+  stamps: []
+};
 
-function roomOf(code) {
-  let room = rooms.get(code);
+function siteOf(req) {
+  const label = String(req.headers.host || '').toLowerCase().split(':')[0].split('.')[0];
+  return SITES.has(label) ? label : DEFAULT_SITE;
+}
+
+function roomKey(site, code) {
+  return site + '/' + code;
+}
+
+function roomOf(site, code) {
+  const key = roomKey(site, code);
+  let room = rooms.get(key);
   if (!room) {
-    if (rooms.size >= ROOM_LIMIT) evictIdleRoom();
-    if (rooms.size >= ROOM_LIMIT) return null;
-    room = { peers: new Map(), strokes: new Map(), points: 0, cache: null, labs: {}, checker: null, idleSince: Date.now() };
-    rooms.set(code, room);
+    const limited = code !== 'main';
+    if (limited && rooms.size >= ROOM_LIMIT) evictIdleRoom();
+    if (limited && rooms.size >= ROOM_LIMIT) return null;
+    room = { site, code, peers: new Map(), strokes: new Map(), points: 0, cache: null, labs: {}, checker: null, idleSince: Date.now() };
+    rooms.set(key, room);
   }
   room.idleSince = Date.now();
   return room;
@@ -118,14 +180,17 @@ function validAnchor(value) {
   return typeof value === 'string' && /^[a-z0-9-]{1,32}$/.test(value);
 }
 
-function cleanName(value) {
-  if (typeof value !== 'string') return 'Гость';
-  const name = Array.from(value)
+function clip(value, limit) {
+  if (typeof value !== 'string') return '';
+  const clean = Array.from(value)
     .filter(char => char.codePointAt(0) >= 32 && char.codePointAt(0) !== 127)
     .join('')
-    .trim()
-    .slice(0, 24);
-  return name || 'Гость';
+    .trim();
+  return Array.from(clean).slice(0, limit).join('').toWellFormed();
+}
+
+function cleanName(value) {
+  return clip(value, 24) || 'Гость';
 }
 
 function cleanColor(value) {
@@ -151,7 +216,7 @@ function addressOf(req) {
   return network(socket);
 }
 
-function hit(counters, key, window, limit) {
+function hit(counters, key, window, limit, amount = 1) {
   const now = Date.now();
   let entry = counters.get(key);
   if (!entry || now - entry.start >= window) {
@@ -164,7 +229,7 @@ function hit(counters, key, window, limit) {
     entry = { start: now, count: 0 };
     counters.set(key, entry);
   }
-  entry.count += 1;
+  entry.count += amount;
   return entry.count <= limit;
 }
 
@@ -212,7 +277,7 @@ function strokesJson(room) {
   return room.cache;
 }
 
-function openStream(req, res, url) {
+function openStream(req, res, url, site) {
   const code = url.searchParams.get('room') || 'main';
   const cid = url.searchParams.get('cid');
   if (!validRoom(code) || !validId(cid)) {
@@ -225,7 +290,7 @@ function openStream(req, res, url) {
     json(res, 429, { error: 'слишком много подключений' });
     return;
   }
-  const room = roomOf(code);
+  const room = roomOf(site, code);
   if (!room) {
     json(res, 503, { error: 'все комнаты заняты' });
     return;
@@ -252,9 +317,12 @@ function openStream(req, res, url) {
   });
   res.write('retry: 2000\n\n');
   peer.streams.add(res);
-  const head = JSON.stringify({ you: peer.id, room: code, peers: peersOf(room, true), labs: room.labs, checker: room.checker, now: Date.now() });
+  const hello = { you: peer.id, room: code, peers: peersOf(room, true), labs: room.labs, checker: room.checker, now: Date.now() };
+  if (SITES.get(site).chat) hello.chat = chatSnapshot();
+  const head = JSON.stringify(hello);
   deliver(res, chunkOf('hello', head.slice(0, -1) + ',"strokes":' + strokesJson(room) + '}'));
   broadcast(room, 'presence', { peers: peersOf(room) }, peer.id);
+  if (SITES.get(site).chat) pollChat();
 
   const beat = setInterval(() => deliver(res, ': ping\n\n'), 20_000);
 
@@ -396,7 +464,8 @@ function apply(room, peer, op) {
       return { t: 'l' };
     case 'lab': {
       const at = Number(op.at);
-      if (!LABS.has(op.lab) || !LAB_MODES.has(op.mode) || !SCENARIOS.has(op.scenario)) return null;
+      const settings = SITES.get(room.site);
+      if (!settings.labs.has(op.lab) || !LAB_MODES.has(op.mode) || !settings.scenarios.has(op.scenario)) return null;
       if (!Number.isInteger(op.seed) || op.seed < 0 || op.seed >= 2 ** 31 || !Number.isFinite(at) || at < 0 || at > 1000) return null;
       const speed = op.speed === undefined ? 1 : Number(op.speed);
       if (!Number.isFinite(speed) || speed < 0 || speed > 1) return null;
@@ -405,7 +474,7 @@ function apply(room, peer, op) {
       return state;
     }
     case 'checker': {
-      if (!PRESETS.has(op.preset) || !['run', 'pause'].includes(op.mode) || !Number.isInteger(op.steps) || op.steps < 0 || op.steps > 50) return null;
+      if (!SITES.get(room.site).presets.has(op.preset) || !['run', 'pause'].includes(op.mode) || !Number.isInteger(op.steps) || op.steps < 0 || op.steps > 50) return null;
       const state = { t: 'checker', preset: op.preset, steps: op.steps, mode: op.mode };
       room.checker = { ...state, stamp: Date.now() };
       return state;
@@ -419,7 +488,7 @@ function apply(room, peer, op) {
   }
 }
 
-async function handleOps(req, res, url) {
+async function handleOps(req, res, url, site) {
   const code = url.searchParams.get('room') || 'main';
   const cid = url.searchParams.get('cid');
   if (req.method !== 'POST' || !validRoom(code) || !validId(cid)) {
@@ -430,7 +499,7 @@ async function handleOps(req, res, url) {
     json(res, 429, { error: 'слишком часто' });
     return;
   }
-  const room = rooms.get(code);
+  const room = rooms.get(roomKey(site, code));
   const peer = room && room.peers.get(cid);
   if (!peer) {
     json(res, 409, { error: 'нет подключения к комнате' });
@@ -465,13 +534,195 @@ async function handleOps(req, res, url) {
   json(res, 200, { ok: true, full: room.points >= ROOM_POINT_LIMIT || room.strokes.size >= STROKE_LIMIT });
 }
 
-function serveAsset(req, res, url) {
+function asciiJson(value) {
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, char => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0'));
+}
+
+function timestamp(value) {
+  return typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,9})?Z$/.test(value) ? value : '';
+}
+
+function chatMessage(raw) {
+  const message = raw && typeof raw === 'object' ? raw : {};
+  return { author: clip(message.author, CHAT_AUTHOR_LIMIT), text: clip(message.text, CHAT_TEXT_LIMIT), sendTime: timestamp(message.sendTime) };
+}
+
+function chatSnapshot() {
+  return {
+    ports: chat.clients.map(client => client.port),
+    online: chat.clients.map(client => client.online),
+    logs: chat.clients.map(client => client.log),
+    stamps: chat.stamps
+  };
+}
+
+function chatBroadcast(data) {
+  for (const room of rooms.values()) {
+    if (SITES.get(room.site).chat) broadcast(room, 'chat', data);
+  }
+}
+
+function chatWatched() {
+  for (const room of rooms.values()) {
+    if (SITES.get(room.site).chat && room.peers.size) return true;
+  }
+  return false;
+}
+
+function clientCall(client, route, body = '') {
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      host: client.host,
+      port: client.port,
+      path: route,
+      method: 'POST',
+      agent: false,
+      timeout: CHAT_DEADLINE_MS,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, response => {
+      const chunks = [];
+      let size = 0;
+      response.on('data', chunk => {
+        size += chunk.length;
+        if (size > CHAT_RESPONSE_LIMIT) request.destroy(new Error('too large'));
+        else chunks.push(chunk);
+      });
+      response.on('end', () => {
+        if (response.statusCode !== 200) {
+          reject(new Error('status ' + response.statusCode));
+          return;
+        }
+        try {
+          resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+        } catch (error) {
+          reject(error);
+        }
+      });
+      response.on('error', reject);
+    });
+    request.on('timeout', () => request.destroy(new Error('timeout')));
+    request.on('error', reject);
+    request.end(body);
+  });
+}
+
+function markOnline(client, online) {
+  if (client.online === online) return;
+  client.online = online;
+  chatBroadcast({ t: 'status', online: chat.clients.map(item => item.online) });
+}
+
+function clientRequest(client, route, body) {
+  if (client.waiting >= CHAT_QUEUE_LIMIT) return Promise.reject(new Error('busy'));
+  client.waiting += 1;
+  const result = client.queue.then(() => {
+    const slow = setTimeout(() => markOnline(client, false), CHAT_SLOW_MS);
+    return clientCall(client, route, body).finally(() => clearTimeout(slow));
+  });
+  client.queue = result
+    .then(() => markOnline(client, true), () => markOnline(client, false))
+    .finally(() => {
+      client.waiting -= 1;
+    });
+  return result;
+}
+
+function pollClient(client, index) {
+  if (client.polling) {
+    client.again = true;
+    return;
+  }
+  client.polling = true;
+  clientRequest(client, '/getAndFlushMessages')
+    .then(answer => {
+      if (!Array.isArray(answer) || !answer.length) return;
+      const messages = answer.slice(-CHAT_LOG_LIMIT).map(chatMessage);
+      client.log = client.log.concat(messages).slice(-CHAT_LOG_LIMIT);
+      chatBroadcast({ t: 'got', c: index, m: messages });
+    }, () => {})
+    .finally(() => {
+      client.polling = false;
+      if (client.again) {
+        client.again = false;
+        pollClient(client, index);
+      }
+    });
+}
+
+function pollChat() {
+  chat.clients.forEach(pollClient);
+}
+
+async function sendChat(index, author, text) {
+  const answer = await clientRequest(chat.clients[index], '/sendMessage', asciiJson({ author, text }));
+  const stamp = { c: index, author, text, sendTime: timestamp(answer && answer.sendTime) };
+  chat.stamps = chat.stamps.concat(stamp).slice(-CHAT_LOG_LIMIT);
+  chatBroadcast({ t: 'sent', ...stamp });
+  return stamp;
+}
+
+async function handleChat(req, res, url, site) {
+  const code = url.searchParams.get('room') || 'main';
+  const cid = url.searchParams.get('cid');
+  if (req.method !== 'POST' || !SITES.get(site).chat || !validRoom(code) || !validId(cid)) {
+    json(res, 400, { error: 'плохой запрос' });
+    return;
+  }
+  if (!chat.clients.length) {
+    json(res, 503, { error: 'чат выключен' });
+    return;
+  }
+  const room = rooms.get(roomKey(site, code));
+  const peer = room && room.peers.get(cid);
+  if (!peer) {
+    json(res, 409, { error: 'нет подключения к комнате' });
+    return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await readBody(req));
+  } catch {
+    json(res, 400, { error: 'плохой запрос' });
+    return;
+  }
+  const burst = Boolean(payload && payload.burst === true);
+  const index = Number(payload && payload.c);
+  const text = clip(payload && payload.text, CHAT_TEXT_LIMIT);
+  if (!burst && (!Number.isInteger(index) || !chat.clients[index] || !text)) {
+    json(res, 400, { error: 'пустое сообщение' });
+    return;
+  }
+  if ((burst ? chat.clients : [chat.clients[index]]).some(client => !client.online)) {
+    json(res, 503, { error: 'клиент мессенджера не отвечает' });
+    return;
+  }
+  const count = burst ? BURST_TEXTS.flat().length : 1;
+  if ((burst && !hit(chatBursts, 'burst', BURST_WINDOW, 1)) || !hit(chatPeers, cid, CHAT_PEER_WINDOW, CHAT_PEER_LIMIT)
+    || !hit(chatAddresses, addressOf(req), CHAT_WINDOW, CHAT_ADDRESS_LIMIT, count) || !hit(chatGlobal, 'send', CHAT_GLOBAL_WINDOW, CHAT_GLOBAL_LIMIT, count)) {
+    json(res, 429, { error: 'слишком часто' });
+    return;
+  }
+  const work = burst
+    ? Promise.all(BURST_TEXTS.flatMap((texts, client) => texts.map(value => sendChat(client, peer.name, value))))
+    : sendChat(index, peer.name, text);
+  const outcome = await Promise.race([
+    work.then(() => 'sent', () => 'failed'),
+    new Promise(resolve => setTimeout(resolve, CHAT_SLOW_MS, 'slow'))
+  ]);
+  if (outcome === 'sent') json(res, 200, { ok: true });
+  else if (outcome === 'slow') json(res, 504, { error: 'клиент мессенджера медлит: сообщение уйдёт, когда он ответит' });
+  else json(res, 502, { error: 'клиент мессенджера не ответил' });
+  setTimeout(pollChat, 60);
+  setTimeout(pollChat, 400);
+}
+
+function serveAsset(req, res, url, site) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY });
     res.end('метод не поддерживается');
     return;
   }
-  const asset = assets.get(url.pathname);
+  const asset = assets.get(site).get(url.pathname);
   if (!asset) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY });
     res.end('не найдено');
@@ -494,15 +745,18 @@ function serveAsset(req, res, url) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://local');
+    const site = siteOf(req);
     if (url.pathname === '/healthz') {
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end('ok');
     } else if (url.pathname === '/api/stream') {
-      openStream(req, res, url);
+      openStream(req, res, url, site);
     } else if (url.pathname === '/api/ops') {
-      await handleOps(req, res, url);
+      await handleOps(req, res, url, site);
+    } else if (url.pathname === '/api/chat') {
+      await handleChat(req, res, url, site);
     } else {
-      serveAsset(req, res, url);
+      serveAsset(req, res, url, site);
     }
   } catch {
     if (!res.headersSent) json(res, 400, { error: 'плохой запрос' });
@@ -512,21 +766,22 @@ const server = http.createServer(async (req, res) => {
 
 function evictIdleRoom() {
   let victim = null;
-  for (const [code, room] of rooms) {
-    if (room.peers.size || code === 'main') continue;
+  for (const [key, room] of rooms) {
+    if (room.peers.size || room.code === 'main') continue;
     const current = victim && rooms.get(victim);
     if (!current || room.strokes.size < current.strokes.size
-      || (room.strokes.size === current.strokes.size && room.idleSince < current.idleSince)) victim = code;
+      || (room.strokes.size === current.strokes.size && room.idleSince < current.idleSince)) victim = key;
   }
   if (victim) rooms.delete(victim);
 }
 
 function prune() {
   const now = Date.now();
-  for (const [code, room] of rooms) {
-    if (!room.peers.size && now - room.idleSince > ROOM_TTL) rooms.delete(code);
+  for (const [key, room] of rooms) {
+    if (!room.peers.size && now - room.idleSince > ROOM_TTL) rooms.delete(key);
   }
-  for (const [counters, window] of [[opens, OPEN_WINDOW], [addressOps, OPS_WINDOW], [peerOps, OPS_WINDOW]]) {
+  const windows = [[opens, OPEN_WINDOW], [addressOps, OPS_WINDOW], [peerOps, OPS_WINDOW], [chatPeers, CHAT_PEER_WINDOW], [chatAddresses, CHAT_WINDOW], [chatGlobal, CHAT_GLOBAL_WINDOW], [chatBursts, BURST_WINDOW]];
+  for (const [counters, window] of windows) {
     for (const [key, entry] of counters) {
       if (now - entry.start >= window) counters.delete(key);
     }
@@ -534,7 +789,10 @@ function prune() {
 }
 
 setInterval(prune, 60_000).unref();
+setInterval(() => {
+  if (chat.clients.length && chatWatched()) pollChat();
+}, CHAT_POLL_MS).unref();
 
 server.listen(PORT, HOST, () => {
-  console.log(`guarantees: http://${HOST}:${PORT}`);
+  console.log(`distsys: http://${HOST}:${PORT}`);
 });
