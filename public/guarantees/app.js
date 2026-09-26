@@ -31,7 +31,7 @@ board = startBoard({
   }
 });
 mountSketches(SKETCHES, {
-  top: 'postal-hero',
+  top: 'airmail-hero',
   model: 'storm',
   amo: 'once',
   alo: 'retry',
@@ -39,8 +39,8 @@ mountSketches(SKETCHES, {
   eoo: 'ordered',
   resources: 'gauge',
   bug: 'bug',
-  results: 'rosette',
-  'board-section': 'quill'
+  results: 'trophy',
+  'board-section': 'pencil'
 });
 mark(document.querySelector('h1 .mark'), 'underline', 700);
 markVerdicts();
