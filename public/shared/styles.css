@@ -818,9 +818,63 @@ footer a { color: var(--muted); }
 
 .chapter-head { position: relative; }
 .hero .wrap { position: relative; }
-.sketch { position: absolute; right: 0; bottom: calc(100% - 28px); width: 150px; height: 112px; overflow: visible; pointer-events: none; }
+.sketch { position: absolute; right: 0; bottom: calc(100% - 28px); width: var(--w, 150px); height: var(--h, 112px); overflow: visible; pointer-events: none; }
 .hero-sketch { position: relative; right: auto; bottom: auto; display: block; width: min(560px, 100%); height: auto; aspect-ratio: 13 / 8; margin: -28px 0 -44px auto; }
 .sketch path, .mark-ink path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.sketch g, .sketch path, .mark-ink g, .mark-ink path { transform-box: fill-box; transform-origin: center; }
+.alive .part-sparkle path { animation: twinkle 2.8s ease-in-out infinite; animation-delay: calc(var(--i) * -.9s); }
+.alive .part-trail path { animation: chase 2.4s linear infinite; animation-delay: calc(var(--i) * .06s); }
+.alive .part-plane { animation: glide 5s ease-in-out infinite; }
+.alive .part-float { animation: float 4.6s ease-in-out infinite; }
+.alive .part-wiggle { animation: wiggle 3.4s ease-in-out infinite; }
+.alive .part-beat { animation: beat 1.8s ease-in-out infinite; }
+.alive .part-blink path { animation: blink 1.6s steps(1) infinite; animation-delay: calc(var(--i) * .4s); }
+.alive .part-pulse path { animation: pulse 2.2s ease-in-out infinite; animation-delay: calc(var(--i) * .2s); }
+.alive .part-stamp { animation: stamp 3.8s ease-in-out infinite; }
+.alive .part-flag { animation: flag 3.4s ease-in-out infinite; transform-origin: left bottom; }
+.alive .part-drop { animation: drop 3.4s ease-in-out infinite; }
+.alive .part-nudge-left { animation: nudge-left 3.2s ease-in-out infinite; }
+.alive .part-nudge-right { animation: nudge-right 3.2s ease-in-out infinite; }
+.alive .part-plug { animation: plug 3.4s ease-in-out infinite; }
+.alive .part-flash { animation: flash 3.4s linear infinite; }
+.alive .part-spin { animation: spin 6s linear infinite; }
+.alive .part-shine { animation: spin 16s linear infinite; }
+.alive .part-hop-a { animation: hop 2.4s ease-in-out infinite; }
+.alive .part-hop-b { animation: hop 2.4s ease-in-out .3s infinite; }
+.alive .part-hop-c { animation: hop 2.4s ease-in-out .6s infinite; }
+.alive .part-swing { animation: swing 3.6s ease-in-out infinite; transform-origin: right bottom; }
+.alive .part-legs path { animation: legs .6s ease-in-out infinite; animation-delay: calc(var(--i) * -.1s); }
+.alive .part-antenna { animation: wiggle 2.6s ease-in-out infinite; }
+.alive .part-fall { animation: fall 3.8s ease-in-out infinite; }
+.alive .part-fly { animation: fly 3.8s ease-in-out infinite; }
+.alive .part-press { animation: press 2.8s ease-in-out infinite; }
+.alive .part-postmark { animation: stamp 2.8s ease-in-out infinite; }
+.alive .part-write { animation: write 1.8s ease-in-out infinite; transform-origin: left bottom; }
+.alive .part-confetti path { animation: confetti 3s ease-in-out infinite; animation-delay: calc(var(--i) * -.45s); }
+@keyframes twinkle { 0%, 100% { transform: none; opacity: 1; } 50% { transform: scale(.55) rotate(25deg); opacity: .5; } }
+@keyframes chase { 0%, 100% { opacity: 1; } 10% { opacity: .15; } 26% { opacity: 1; } }
+@keyframes glide { 0%, 100% { transform: none; } 50% { transform: translate(7px, -9px) rotate(-4deg); } }
+@keyframes float { 0%, 100% { transform: none; } 50% { transform: translateY(-5px); } }
+@keyframes wiggle { 0%, 66%, 100% { transform: none; } 74% { transform: rotate(-6deg); } 83% { transform: rotate(5deg); } 92% { transform: rotate(-2deg); } }
+@keyframes beat { 0%, 60%, 100% { transform: none; } 15% { transform: scale(1.25); } 30% { transform: scale(.95); } 45% { transform: scale(1.12); } }
+@keyframes blink { 0% { opacity: 1; } 50% { opacity: .2; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+@keyframes stamp { 0%, 70%, 100% { transform: none; } 78% { transform: scale(1.3) rotate(-10deg); } 86% { transform: scale(.92) rotate(3deg); } }
+@keyframes flag { 0%, 35%, 100% { transform: none; } 50%, 80% { transform: rotate(80deg); } }
+@keyframes drop { 0%, 20%, 100% { transform: none; opacity: 1; } 55% { transform: translate(64px, 22px) scale(.7); opacity: 0; } 56% { transform: translate(-8px, -8px); opacity: 0; } 78% { transform: none; opacity: 1; } }
+@keyframes nudge-left { 0%, 55%, 100% { transform: none; } 15%, 40% { transform: translateX(12px); } }
+@keyframes nudge-right { 0%, 45%, 100% { transform: none; } 60%, 85% { transform: translateX(-12px); } }
+@keyframes plug { 0%, 100% { transform: none; } 40%, 60% { transform: translateX(26px); } }
+@keyframes flash { 0%, 36%, 64%, 100% { opacity: 1; } 42%, 58% { opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes hop { 0%, 40%, 100% { transform: none; } 15% { transform: translateY(-9px); } 25% { transform: none; } }
+@keyframes swing { 0%, 100% { transform: none; } 50% { transform: rotate(60deg); } }
+@keyframes legs { 0%, 100% { transform: none; } 50% { transform: rotate(9deg); } }
+@keyframes fall { 0%, 15%, 100% { transform: none; opacity: 1; } 60% { transform: translate(-6px, 16px) rotate(16deg); opacity: 0; } 61% { transform: translate(0, -12px); opacity: 0; } 85% { transform: none; opacity: 1; } }
+@keyframes fly { 0%, 20%, 100% { transform: none; opacity: 1; } 60% { transform: translate(70px, -26px) scale(.6) rotate(-8deg); opacity: 0; } 61% { transform: translate(-12px, 4px); opacity: 0; } 85% { transform: none; opacity: 1; } }
+@keyframes press { 0%, 45%, 100% { transform: none; } 58%, 66% { transform: translateY(22px); } }
+@keyframes write { 0%, 100% { transform: none; } 25% { transform: rotate(-4deg) translate(-2px, 1px); } 50% { transform: rotate(3deg) translate(2px, 0); } 75% { transform: rotate(-2deg) translate(-1px, -1px); } }
+@keyframes confetti { 0%, 100% { transform: none; } 50% { transform: translateY(6px) rotate(40deg); } }
 .mark { position: relative; white-space: nowrap; }
 svg.mark-ink { position: absolute; overflow: visible; pointer-events: none; }
 svg.mark-ink.circle { left: -10%; top: -16%; width: 120%; height: 132%; }
@@ -830,6 +884,6 @@ svg.mark-ink.ok, svg.mark-ink.zigzag { left: 0; bottom: -9px; width: 100%; heigh
 .verdict > span, .results-grid .status { position: relative; }
 
 @media (max-width: 760px) {
-  .sketch { width: 88px; height: 66px; bottom: 100%; }
+  .sketch { width: calc(var(--w, 150px) * .58); height: calc(var(--h, 112px) * .58); bottom: 100%; }
   .hero-sketch { width: 100%; height: auto; margin: 12px 0 -24px auto; }
 }

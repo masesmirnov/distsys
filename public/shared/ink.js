@@ -3,6 +3,9 @@ const TAU = Math.PI * 2;
 const COLORS = ['var(--ink)', '#3987e5', '#eb6834', '#1baf7a', '#e87ba4', '#9085e9', '#e34948', '#eda100'];
 const SPEED = 520;
 const GAP = 60;
+const QUICK = 40;
+const QUICK_GAP = 18;
+const VISIT = Math.random().toString(36).slice(2);
 const calm = matchMedia('(prefers-reduced-motion: reduce)');
 
 function random(seed) {
@@ -112,9 +115,15 @@ export class Pen {
     this.random = random(hash(name));
     this.jitter = jitter;
     this.strokes = [];
+    this.current = null;
   }
 
-  line(color, width, points, { closed = false, wobble = 1, step = 3.5 } = {}) {
+  part(name) {
+    this.current = name;
+    return this;
+  }
+
+  line(color, width, points, { closed = false, wobble = 1, step = 3.5, quick = false } = {}) {
     let path = resample(points, step);
     const amplitude = this.jitter * wobble;
     const phase = [this.random() * TAU, this.random() * TAU];
@@ -136,12 +145,12 @@ export class Pen {
       const extra = path.slice(1, Math.max(3, Math.round(path.length * 0.06)));
       path = [...path, ...extra.map(([x, y], index) => [x + (index + 1) * 0.25 * this.jitter, y - (index + 1) * 0.15 * this.jitter])];
     }
-    this.strokes.push({ color, width, points: path });
+    this.strokes.push({ color, width, points: path, part: this.current, quick });
     return this;
   }
 
   dot(color, size, x, y) {
-    this.strokes.push({ color, width: size, points: [[x, y]] });
+    this.strokes.push({ color, width: size, points: [[x, y]], part: this.current, quick: true });
     return this;
   }
 }
@@ -158,14 +167,33 @@ function pathData(points) {
 }
 
 export function render(svg, strokes, hidden) {
-  svg.replaceChildren(...strokes.map(stroke => {
+  const nodes = [];
+  const counts = new Map();
+  let group = null;
+  for (const stroke of strokes) {
     const path = document.createElementNS(NS, 'path');
     path.setAttribute('d', pathData(stroke.points));
     path.setAttribute('stroke-width', String(stroke.width));
     path.style.stroke = COLORS[stroke.color];
+    if (stroke.quick) path.dataset.quick = '';
     if (hidden) path.style.opacity = '0';
-    return path;
-  }));
+    if (!stroke.part) {
+      group = null;
+      nodes.push(path);
+      continue;
+    }
+    const index = counts.get(stroke.part) || 0;
+    counts.set(stroke.part, index + 1);
+    path.style.setProperty('--i', String(index));
+    if (!group || group.dataset.part !== stroke.part) {
+      group = document.createElementNS(NS, 'g');
+      group.dataset.part = stroke.part;
+      group.classList.add('part-' + stroke.part);
+      nodes.push(group);
+    }
+    group.append(path);
+  }
+  svg.replaceChildren(...nodes);
 }
 
 export function draw(svg, delay = 0) {
@@ -179,31 +207,38 @@ export function draw(svg, delay = 0) {
   const scale = box && box.width ? svg.clientWidth / box.width : 1;
   let at = delay;
   for (const path of svg.querySelectorAll('path')) {
+    const quick = 'quick' in path.dataset;
     const length = Math.max(0.5, path.getTotalLength());
-    const duration = Math.max(90, length * scale / SPEED * 1000);
+    const duration = Math.max(quick ? QUICK : 90, length * scale / SPEED * 1000);
     path.style.strokeDasharray = `${length} ${length}`;
     path.style.strokeDashoffset = String(length);
     path.style.opacity = '';
     path.animate([{ strokeDashoffset: length }, { strokeDashoffset: 0 }], { duration, delay: at, easing: 'cubic-bezier(.4, .05, .3, 1)', fill: 'forwards' });
-    at += duration + GAP;
+    at += duration + (quick ? QUICK_GAP : GAP);
   }
   return at;
 }
 
 function sketchOf(name, design) {
-  const pen = new Pen(name, design.jitter);
+  const pen = new Pen(name + VISIT, design.jitter);
   design.paint(pen);
   return pen.strokes;
 }
 
 export function mountSketches(designs, placements) {
+  const drawn = new WeakSet();
   const observer = new IntersectionObserver(entries => {
     for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      observer.unobserve(entry.target);
-      draw(entry.target, 150);
+      const svg = entry.target;
+      if (drawn.has(svg)) {
+        svg.classList.toggle('alive', entry.isIntersecting);
+      } else if (entry.isIntersecting) {
+        drawn.add(svg);
+        const done = draw(svg, 150);
+        setTimeout(() => svg.classList.add('alive'), done);
+      }
     }
-  }, { threshold: 0.55 });
+  }, { threshold: [0, 0.55] });
   for (const [id, name] of Object.entries(placements)) {
     const section = document.getElementById(id);
     const design = designs[name];
@@ -213,8 +248,12 @@ export function mountSketches(designs, placements) {
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${design.size[0]} ${design.size[1]}`);
     svg.setAttribute('aria-hidden', 'true');
-    svg.classList.add('sketch');
+    svg.classList.add('sketch', 'sketch-' + name);
     if (id === 'top') svg.classList.add('hero-sketch');
+    else {
+      svg.style.setProperty('--w', design.size[0] + 'px');
+      svg.style.setProperty('--h', design.size[1] + 'px');
+    }
     host.append(svg);
     render(svg, sketchOf(name, design), !calm.matches);
     observer.observe(svg);
@@ -222,7 +261,7 @@ export function mountSketches(designs, placements) {
 }
 
 function markStrokes(kind, width, height, seed) {
-  const pen = new Pen(seed, 1.1);
+  const pen = new Pen(seed + VISIT, 1.1);
   const weight = Math.min(4.5, Math.max(2.2, height / 30));
   if (kind === 'circle') {
     pen.line(2, weight, arc(width / 2, height / 2, width / 2 - weight, height / 2 - weight, Math.PI * 0.95, Math.PI * 3.12, 72), { wobble: 1.4 });
@@ -233,6 +272,14 @@ function markStrokes(kind, width, height, seed) {
     pen.line(1, Math.min(6, Math.max(3, height / 4)), bezier([2, height * 0.6], [width * 0.35, height * 0.95], [width * 0.7, height * 0.25], [width - 2, height * 0.55]), { wobble: 0.8 });
   } else {
     pen.line(3, 2.6, bezier([4, height - 4], [width * 0.35, height - 1], [width * 0.7, height - 7], [width - 4, height - 5]), { wobble: 0.8 });
+  }
+  if (kind === 'ok') {
+    pen.part('sparkle');
+    pen.line(7, 2, astroid(width + 10, height - 18, 5), { closed: true, wobble: 0.2, step: 1.5, quick: true });
+    pen.line(7, 2, astroid(width + 22, height - 30, 3.5), { closed: true, wobble: 0.2, step: 1.5, quick: true });
+  } else if (kind === 'zigzag') {
+    pen.part('flash');
+    pen.line(7, 2.2, [[width + 16, height - 34], [width + 8, height - 18], [width + 18, height - 16], [width + 10, height]], { wobble: 0.1, step: 1.5 });
   }
   return pen.strokes;
 }
@@ -248,7 +295,9 @@ export function mark(target, kind, delay = 0) {
     if (!width || !height) return;
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     render(svg, markStrokes(kind, width, height, target.textContent), animate && !calm.matches);
-    if (animate) draw(svg, delay);
+    if (!animate) return;
+    const done = draw(svg, delay);
+    setTimeout(() => svg.classList.add('alive'), done);
   };
   paint(true);
   let sized = false;
