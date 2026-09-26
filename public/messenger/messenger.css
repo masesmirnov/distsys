@@ -234,6 +234,7 @@
 .results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .results-grid h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .results-grid h3 .status { font-size: 13px; }
+.results-grid li { overflow-wrap: anywhere; }
 
 @media (max-width: 1060px) {
   .results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
