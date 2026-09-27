@@ -64,7 +64,7 @@ const SITES = new Map([
   }],
   ['messenger', {
     labs: new Set(['send', 'subscribe', 'flush', 'reconnect']),
-    scenarios: new Set(['ok', 'nolock', 'outside', 'noretry']),
+    scenarios: new Set(['ok', 'nolock', 'noretry', 'await-before', 'await-inside']),
     presets: new Set(),
     chat: true
   }]

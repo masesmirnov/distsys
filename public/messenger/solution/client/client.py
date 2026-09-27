@@ -88,11 +88,10 @@ def main():
     channel = grpc.insecure_channel(grpc_server_address)
     stub = messenger_pb2_grpc.MessengerServerStub(channel)
 
-    # A list of messages obtained from the server but not yet requested by the user to be shown
+    # A list of messages obtained from the server-py but not yet requested by the user to be shown
     # (via the http's /getAndFlushMessages).
     postbox = PostBox()
 
-    # Consume the ReadMessages stream in a background thread, independently of HTTP requests.
     consumer = threading.Thread(target=_consume_messages, args=(stub, postbox), daemon=True)
     consumer.start()
 

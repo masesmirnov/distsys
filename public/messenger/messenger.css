@@ -19,6 +19,7 @@
 .t0 { --tc: var(--t0); --tc-soft: var(--t0-soft); }
 .t1 { --tc: var(--t1); --tc-soft: var(--t1-soft); }
 .t2 { --tc: var(--t2); --tc-soft: var(--t2-soft); }
+.t3 { --tc: var(--muted); --tc-soft: var(--hover); }
 
 .chat {
   display: grid;
@@ -228,8 +229,9 @@
 .code .ln.hit .tag { color: var(--tc); border-color: var(--tc); background: var(--surface); }
 .code .ln.removed .src { text-decoration: line-through; text-decoration-color: var(--bad); opacity: .55; }
 .code .ln.removed { background: var(--bad-soft); }
-.code .ln.moved { box-shadow: inset 2px 0 0 var(--buffer-line); }
-.code .ln.moved.hit { box-shadow: inset 2px 0 0 var(--tc); }
+.code .ln.added { background: var(--buffer); box-shadow: inset 2px 0 0 var(--buffer-line); }
+.code .ln.added .no { color: var(--buffer-line); }
+.code .ln.added.hit { box-shadow: inset 2px 0 0 var(--tc); }
 
 .results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .results-grid h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }

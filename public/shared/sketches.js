@@ -189,18 +189,14 @@ export const SKETCHES = {
       sparkle(pen, 24, 24, 8);
     }
   },
-  padlock: {
+  loop: {
     size: ICON,
     paint(pen) {
-      pen.line(0, 2.6, spline([[62, 56], [62, 34], [80, 20], [98, 34], [98, 56]], false, 8), { wobble: 0.4 });
-      pen.line(7, 2.6, roundRect(46, 54, 68, 54, 10), { closed: true });
-      pen.line(0, 2.2, arc(80, 76, 5, 5, -Math.PI / 2, 1.5 * Math.PI, 12), { closed: true, wobble: 0.1, step: 1.5 });
-      pen.line(0, 2.2, [[80, 81], [80, 94]], { wobble: 0.1 });
-      pen.line(1, 2.2, [[8, 100], [36, 92]], { wobble: 0.3 });
-      arrowHead(pen, 1, 2.2, [36, 92], [8, 100]);
-      pen.line(2, 2.2, [[152, 100], [124, 92]], { wobble: 0.3 });
-      arrowHead(pen, 2, 2.2, [124, 92], [152, 100]);
-      sparkle(pen, 130, 24, 8);
+      pen.line(1, 2.6, arc(80, 62, 54, 40, -Math.PI * 0.3, Math.PI * 1.42, 64), { wobble: 0.5 });
+      arrowHead(pen, 1, 2.6, arc(80, 62, 54, 40, Math.PI * 1.42, Math.PI * 1.42, 1)[0], arc(80, 62, 54, 40, Math.PI * 1.3, Math.PI * 1.3, 1)[0], 10);
+      [[80, 22], [134, 62], [80, 102], [26, 62]].forEach(([x, y], index) => pen.line(index ? 0 : 2, index ? 2 : 2.6, roundRect(x - 11, y - 8, 22, 16, 4), { closed: true, wobble: 0.3 }));
+      pen.line(2, 2.4, [[73, 52], [91, 62], [73, 72], [73, 52]], { closed: true, wobble: 0.3 });
+      sparkle(pen, 146, 20, 8);
     }
   },
   antenna: {

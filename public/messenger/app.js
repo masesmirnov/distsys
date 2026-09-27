@@ -98,7 +98,7 @@ mountSketches(SKETCHES, {
   top: 'messenger-hero',
   chat: 'server',
   proto: 'contract',
-  send: 'padlock',
+  send: 'loop',
   subscribe: 'antenna',
   flush: 'mailbox',
   reconnect: 'plug',

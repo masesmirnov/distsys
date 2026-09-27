@@ -3,23 +3,21 @@ import { ICON, element, highlight } from './code.js';
 const STEP_MS = 1100;
 
 const PYTHON = {
-  keywords: new Set(['class', 'def', 'if', 'else', 'return', 'while', 'for', 'in', 'not', 'and', 'or', 'is', 'None', 'True', 'False', 'from', 'import', 'with', 'try', 'except', 'finally', 'yield', 'lambda', 'self', 'pass']),
+  keywords: new Set(['class', 'def', 'async', 'await', 'if', 'else', 'return', 'while', 'for', 'in', 'not', 'and', 'or', 'is', 'None', 'True', 'False', 'from', 'import', 'with', 'try', 'except', 'finally', 'yield', 'lambda', 'self', 'pass']),
   builtins: new Set(['max', 'set', 'int', 'str', 'len', 'Timestamp']),
   definers: new Set(['def', 'class'])
 };
 
 const TAGS = {
   server: {
-    21: 'один поток за раз',
-    22: 'строго больше прошлого',
-    31: 'все подписки',
-    32: 'в очередь потока',
-    36: 'своя очередь',
-    38: 'подписка началась',
-    39: 'разбудит при отмене',
-    42: 'спит до сообщения',
-    45: 'в поток клиенту',
-    48: 'отписка'
+    17: 'внутри ни одного await',
+    18: 'строго больше прошлого',
+    22: 'все подписки',
+    23: 'без ожидания',
+    27: 'своя очередь',
+    28: 'подписка началась',
+    31: 'единственный await',
+    33: 'отписка'
   },
   client: {
     27: 'атомарно',
@@ -37,21 +35,24 @@ const TAGS = {
 const SOURCES = { server: 'solution/server/server.py', client: 'solution/client/client.py' };
 
 const CHANGES = {
-  'send:nolock': { removed: [21], dedent: [[22, 32]] },
-  'send:outside': { moved: [[31, 32]], dedent: [[31, 32]] },
-  'subscribe:nolock': { removed: [37], dedent: [[38, 38]] },
+  'send:await-before': { added: [[21, '        await save_to_db(message)']] },
+  'send:await-inside': { added: [[23, '            await asyncio.sleep(0)']] },
+  'subscribe:await-inside': { added: [[23, '            await asyncio.sleep(0)']] },
   'flush:nolock': { removed: [27, 33], dedent: [[28, 29], [34, 34]] },
   'reconnect:noretry': { removed: [76, 81, 82], dedent: [[77, 80]] }
 };
 
 const STATES = {
-  ready: 'ещё не начал',
+  ready: 'ждёт старта',
   lock: 'ждёт lock',
   wait: 'ждёт',
+  await: 'на await',
   sleep: 'спит 1 с',
   done: 'готово',
-  error: 'упал'
+  error: 'ошибка'
 };
+
+const PAUSES = { ok: null, 'await-before': 'before', 'await-inside': 'inside' };
 
 class Lock {
   constructor() {
@@ -115,56 +116,63 @@ function* sleepUntil(thread, blocked, lines, note) {
 const queue = (name, who) => ({ name, who, items: [], sent: [] });
 const names = items => items.map(item => item.text).join(', ');
 
-function* sendMessage(world, thread, { locked, outside, text }) {
-  if (locked) yield* acquire(thread, world.lock, 21);
+function* sendMessage(world, thread, { text, pause }) {
   const now = world.clock.shift();
   const stamp = Math.max(now, world.last + 1);
   thread.set('send_time_ns', String(stamp));
-  yield { lines: [22], note: `time_ns() = ${now} → max(${now}, ${world.last} + 1) = ${stamp}` };
+  yield { lines: [18], note: `time_ns() = ${now} → max(${now}, ${world.last} + 1) = ${stamp}` };
   world.last = stamp;
-  yield { lines: [23], note: `_last_time_ns = ${stamp}` };
+  yield { lines: [19], note: `_last_time_ns = ${stamp}` };
   const item = { author: thread.index, text, time: stamp };
   thread.set('message', `«${text}» · ${stamp}`);
-  yield { lines: [24, 25, 26, 27, 28, 29, 30], note: `ChatMessage «${text}», sendTime = ${stamp}` };
-  if (locked && outside) {
-    release(thread, world.lock);
-    yield { lines: [21], note: 'вышел из with — lock свободен до рассылки' };
-  }
+  yield { lines: [20, 21], note: `ChatMessage «${text}», sendTime = ${stamp}` };
+  if (pause === 'before') yield { lines: [21.5], note: 'await save_to_db — корутина отдаёт event loop', await: true };
   const size = world.subs.length;
   for (let index = 0; ; index++) {
     if (world.subs.length !== size) {
-      release(thread, world.lock);
       world.errors.push(text);
-      return { lines: [31], note: 'RuntimeError: Set changed size during iteration', error: true };
+      return { lines: [22], note: 'RuntimeError: Set changed size during iteration', error: true };
     }
     if (index >= size) break;
     const target = world.subs[index];
     target.items.push(item);
-    yield { lines: [31, 32], note: `${target.name} ← «${text}»` };
+    yield { lines: [22, 23], note: `${target.name}.put_nowait(«${text}»)` };
+    if (pause === 'inside') yield { lines: [23.5], note: 'await asyncio.sleep(0) — рассылка прервалась на полпути', await: true };
   }
-  const held = world.lock.owner === thread;
-  release(thread, world.lock);
   world.replies.push(item);
-  return { lines: [33], note: `${held ? 'lock свободен · ' : ''}ответ: sendTime = ${stamp}` };
+  return { lines: [24], note: `ответ: sendTime = ${stamp}` };
 }
 
-function* readMessages(world, thread, { locked }) {
+function* readMessages(world, thread) {
   const own = queue('q2', 'клиент 2');
+  world.late = own;
   thread.set('subscriber', 'q2');
-  yield { lines: [36], note: 'новая SimpleQueue — ещё не в подписках' };
-  if (locked) yield* acquire(thread, world.lock, 37);
+  yield { lines: [27], note: 'asyncio.Queue() — своя очередь' };
   world.subs.push(own);
-  release(thread, world.lock);
-  yield { lines: [38], note: `q2 в _subscribers — подписка началась${locked ? ' · lock свободен' : ''}` };
-  yield { lines: [39], note: 'add_callback: при отмене положит None' };
+  yield { lines: [28], note: 'q2 в _subscribers — подписка началась' };
   for (;;) {
-    yield* sleepUntil(thread, () => !own.items.length, [42], 'get() спит: очередь пуста');
+    if (!own.items.length && !world.hangup) {
+      thread.state = 'wait';
+      thread.waitFor = () => !own.items.length && !world.hangup;
+      yield { lines: [30, 31], note: 'await get() — ждёт сообщение, event loop свободен', await: true };
+      thread.waitFor = null;
+      thread.state = 'run';
+    }
+    if (world.hangup) {
+      yield { lines: [31], note: 'клиент отключился — на await прилетает CancelledError' };
+      world.subs.splice(world.subs.indexOf(own), 1);
+      return { lines: [32, 33], note: 'finally: discard(q2) — подписка снята' };
+    }
     const item = own.items.shift();
-    thread.set('message', `«${item.text}» · ${item.time}`);
-    yield { lines: [42, 43], note: `get() → «${item.text}»` };
     own.sent.push(item);
-    yield { lines: [45], note: `yield: «${item.text}» ушло клиенту 2` };
+    thread.set('message', `«${item.text}» · ${item.time}`);
+    yield { lines: [31], note: `yield «${item.text}» → в поток клиенту 2`, await: true };
   }
+}
+
+function* hangup(world) {
+  world.hangup = true;
+  return { lines: [], note: 'клиент 2 закрыл соединение — gRPC отменяет ReadMessages', external: true };
 }
 
 function* consume(world, thread, { locked }) {
@@ -241,22 +249,23 @@ function* network(world) {
 }
 
 function serverWorld(subs) {
-  return { lock: new Lock(), last: 0, clock: [1000, 1000], subs: subs.map(([name, who]) => queue(name, who)), replies: [], errors: [] };
+  return { last: 0, clock: [1000, 1000], subs: subs.map(([name, who]) => queue(name, who)), replies: [], errors: [], hangup: false, late: null };
 }
 
 const LABS = {
   send: {
-    variants: { ok: 'решение', nolock: 'без lock', outside: 'рассылка вне lock' },
-    panes: [{ file: 'server', title: 'SendMessage', range: [20, 33] }],
+    variants: { ok: 'решение', 'await-before': 'await перед рассылкой', 'await-inside': 'await внутри рассылки' },
+    cooperative: true,
+    panes: [{ file: 'server', title: 'SendMessage', range: [17, 24] }],
     world: () => serverWorld([['q1', 'клиент 1'], ['q2', 'клиент 2']]),
     threads: [
-      { name: 'поток 1', call: 'SendMessage(alice, «привет»)', run: (world, thread, variant) => sendMessage(world, thread, { locked: variant !== 'nolock', outside: variant === 'outside', text: 'привет' }) },
-      { name: 'поток 2', call: 'SendMessage(bob, «hi»)', run: (world, thread, variant) => sendMessage(world, thread, { locked: variant !== 'nolock', outside: variant === 'outside', text: 'hi' }) }
+      { name: 'корутина 1', call: 'SendMessage(alice, «привет»)', run: (world, thread, variant) => sendMessage(world, thread, { text: 'привет', pause: PAUSES[variant] }) },
+      { name: 'корутина 2', call: 'SendMessage(bob, «hi»)', run: (world, thread, variant) => sendMessage(world, thread, { text: 'hi', pause: PAUSES[variant] }) }
     ],
     schedules: {
-      ok: [0, 1, 0, 0, 0, 0, 0, 0],
-      nolock: [0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1],
-      outside: [0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1]
+      ok: [0, 1],
+      'await-before': [0, 1, 1, 0],
+      'await-inside': [0, 1, 1, 0, 1, 0]
     },
     render: renderServer,
     verdict: world => {
@@ -266,35 +275,35 @@ const LABS = {
       if (new Set(stamps).size < stamps.length) problems.push(`sendTime совпал: ${stamps.join(' = ')}`);
       if (orders.some(order => order !== orders[0])) problems.push(`порядок разный: ${world.subs.map(target => `${target.name} [${names(target.items)}]`).join(', ')}`);
       const falling = world.subs.find(target => target.items.some((item, index) => index > 0 && item.time < target.items[index - 1].time));
-      if (falling) problems.push(`в ${falling.name} sendTime убывает`);
+      if (falling) problems.push(`в ${falling.name} sendTime идёт назад: ${falling.items.map(item => item.time).join(' → ')}`);
       if (problems.length) return { ok: false, text: problems.join(' · ') };
       return { ok: true, text: `q1 и q2: [${orders[0]}] · sendTime ${stamps.join(' < ')}` };
     }
   },
   subscribe: {
-    variants: { ok: 'решение', nolock: 'add без lock' },
+    variants: { ok: 'решение', 'await-inside': 'await внутри рассылки' },
+    cooperative: true,
     panes: [
-      { file: 'server', title: 'SendMessage', range: [20, 33] },
-      { file: 'server', title: 'ReadMessages', range: [35, 48] }
+      { file: 'server', title: 'SendMessage', range: [17, 24] },
+      { file: 'server', title: 'ReadMessages', range: [26, 33] }
     ],
     world: () => serverWorld([['q1', 'клиент 1']]),
     threads: [
-      { name: 'поток 1', call: 'SendMessage(alice, «m1»)', run: (world, thread) => sendMessage(world, thread, { locked: true, outside: false, text: 'm1' }) },
-      { name: 'поток 2', call: 'ReadMessages() · клиент 2', run: (world, thread, variant) => readMessages(world, thread, { locked: variant !== 'nolock' }) },
-      { name: 'поток 3', call: 'SendMessage(bob, «m2»)', run: (world, thread) => sendMessage(world, thread, { locked: true, outside: false, text: 'm2' }) }
+      { name: 'корутина 1', call: 'SendMessage(alice, «m1»)', run: (world, thread, variant) => sendMessage(world, thread, { text: 'm1', pause: PAUSES[variant] }) },
+      { name: 'корутина 2', call: 'ReadMessages() · клиент 2', run: (world, thread) => readMessages(world, thread) },
+      { name: 'корутина 3', call: 'SendMessage(bob, «m2»)', run: (world, thread, variant) => sendMessage(world, thread, { text: 'm2', pause: PAUSES[variant] }) },
+      { name: 'сеть', call: 'клиент 2 закрывает соединение', run: world => hangup(world) }
     ],
     schedules: {
-      ok: [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2],
-      nolock: [0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2]
+      ok: [0, 1, 2, 1, 3, 1],
+      'await-inside': [0, 1, 0, 2, 2, 1, 2, 3, 1]
     },
     render: renderServer,
     verdict: world => {
       if (world.errors.length) return { ok: false, text: `SendMessage «${world.errors[0]}» упал с RuntimeError, а q1 его уже получил` };
-      const late = world.subs.find(target => target.name === 'q2');
-      const got = late ? names([...late.sent, ...late.items]) : '';
-      return got === 'm2'
-        ? { ok: true, text: 'клиент 2 подписался после m1: пришло только m2' }
-        : { ok: false, text: `клиенту 2 пришло [${got}]` };
+      const got = world.late ? names([...world.late.sent, ...world.late.items]) : '';
+      if (got !== 'm2') return { ok: false, text: `клиенту 2 пришло [${got}]` };
+      return { ok: true, text: 'клиент 2 подписался после m1: пришло только m2 · после отключения q2 убрана' };
     }
   },
   flush: {
@@ -346,6 +355,8 @@ class Race {
     this.threads = spec.threads.map((item, index) => new Thread(index, item));
     for (const thread of this.threads) thread.program = thread.spec.run(this.world, thread, variant);
     this.schedule = spec.schedules[variant];
+    this.cooperative = Boolean(spec.cooperative);
+    this.running = null;
     this.cursor = 0;
     this.steps = 0;
     this.last = null;
@@ -357,6 +368,7 @@ class Race {
   }
 
   pick() {
+    if (this.running && this.ready(this.running)) return this.running;
     while (this.cursor < this.schedule.length) {
       const thread = this.threads[this.schedule[this.cursor++]];
       if (this.ready(thread)) return thread;
@@ -370,9 +382,11 @@ class Race {
       this.finished = true;
       return null;
     }
-    if (thread.state === 'ready') thread.state = 'run';
+    if (thread.state === 'ready' || thread.state === 'await') thread.state = 'run';
     const { value, done } = thread.program.next();
     if (done) thread.state = value.error ? 'error' : 'done';
+    else if (value.await && thread.state === 'run') thread.state = 'await';
+    if (this.cooperative) this.running = done || value.await || value.external ? null : thread;
     thread.lines = value.lines;
     this.steps += 1;
     this.last = { thread: thread.index, ...value };
@@ -405,10 +419,17 @@ function lockBox(lock, threads) {
   return node;
 }
 
+function loopBox(race) {
+  const running = race.running;
+  const node = element('span', 'lockbox' + (running ? ` held t${running.index}` : ''), `${ICON('reset')}<span></span>`);
+  node.querySelector('span').textContent = running ? `event loop · ${running.name}` : 'event loop свободен';
+  return node;
+}
+
 function renderServer(world, race, seen, keys) {
   const card = element('div', 'world');
   const head = element('div', 'world-head', '<b>MessengerServer</b>');
-  head.append(lockBox(world.lock, race.threads));
+  head.append(loopBox(race));
   card.append(head);
   const last = element('div', 'var', '<span class="var-name">_last_time_ns = </span>');
   last.append(element('span', 'var-value', String(world.last)));
@@ -460,11 +481,10 @@ function renderReconnect(world, race, seen, keys) {
 function transform(lines, change) {
   if (!change) return lines.map(([number, text]) => ({ number, text, mark: '' }));
   const inside = (ranges, number) => (ranges || []).some(([from, to]) => number >= from && number <= to);
-  return lines.map(([number, text]) => ({
-    number,
-    text: inside(change.dedent, number) ? text.replace(/^ {4}/, '') : text,
-    mark: (change.removed || []).includes(number) ? 'removed' : inside(change.moved, number) ? 'moved' : ''
-  }));
+  return lines.flatMap(([number, text]) => [
+    { number, text: inside(change.dedent, number) ? text.replace(/^ {4}/, '') : text, mark: (change.removed || []).includes(number) ? 'removed' : '' },
+    ...(change.added || []).filter(([after]) => after === number).map(([, extra]) => ({ number: number + 0.5, text: extra, mark: 'added' }))
+  ]);
 }
 
 class RaceLab {
@@ -561,8 +581,8 @@ class RaceLab {
       pane.rows = new Map();
       pane.pre.replaceChildren();
       for (const line of lines) {
-        const row = element('span', 'ln' + (line.mark ? ' ' + line.mark : ''), `<span class="no"><span class="pcs"></span>${line.number}</span><span class="src">${highlight(line.text, PYTHON) || ' '}</span>`);
-        if (line.mark) row.title = line.mark === 'removed' ? 'в этом варианте строки нет' : 'в этом варианте строка вынесена из with';
+        const row = element('span', 'ln' + (line.mark ? ' ' + line.mark : ''), `<span class="no"><span class="pcs"></span>${line.mark === 'added' ? '+' : line.number}</span><span class="src">${highlight(line.text, PYTHON) || ' '}</span>`);
+        if (line.mark) row.title = line.mark === 'removed' ? 'в этом варианте строки нет' : 'в этом варианте строка добавлена';
         if (tags[line.number] && !line.mark) row.append(element('span', 'tag', tags[line.number]));
         pane.rows.set(line.number, row);
         pane.pre.append(row);

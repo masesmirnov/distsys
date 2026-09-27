@@ -3,7 +3,7 @@
 Страницы для защиты домашних заданий: живые симуляции поверх настоящего кода решений, прогоны официальных тестов и общая доска, на которой все открывшие ссылку рисуют вместе и видят курсоры друг друга.
 
 - [guarantees.maserov.com](https://guarantees.maserov.com) — ДЗ 1, гарантии доставки: AMO, ALO, EO и EOO, замеры ресурсов и баг в проверке порядка.
-- [messenger.maserov.com](https://messenger.maserov.com) — ДЗ 2, мессенджер на gRPC: живой чат на настоящих `server.py` и двух `client.py`, гонки потоков по шагам с поломками «без lock» и официальный прогон.
+- [messenger.maserov.com](https://messenger.maserov.com) — ДЗ 2, мессенджер на gRPC: живой чат на настоящих `server.py` и двух `client.py`, гонки по шагам с поломками вроде «await внутри рассылки» и официальный прогон.
 
 Устанавливается из `masesmirnov/infra` скриптом `scripts/deploy_distsys.py` по файлам, закреплённым хешами в `locks/distsys.json`.
 
