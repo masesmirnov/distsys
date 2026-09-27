@@ -10,36 +10,36 @@ const PYTHON = {
 
 const TAGS = {
   server: {
-    17: 'внутри ни одного await',
-    18: 'строго больше прошлого',
-    22: 'все подписки',
-    23: 'без ожидания',
-    27: 'своя очередь',
-    28: 'подписка началась',
-    31: 'единственный await',
-    33: 'отписка'
+    16: 'внутри ни одного await',
+    17: 'строго больше прошлого',
+    21: 'все подписки',
+    22: 'без ожидания',
+    26: 'своя очередь',
+    27: 'подписка началась',
+    30: 'единственный await',
+    32: 'отписка'
   },
   client: {
-    27: 'атомарно',
-    28: 'копия',
-    29: 'буфер пуст',
-    33: 'тот же lock',
-    34: 'в конец',
-    77: 'подписка',
-    79: 'по порядку',
-    81: 'обрыв',
-    82: 'и заново'
+    24: 'атомарно',
+    25: 'копия',
+    26: 'буфер пуст',
+    30: 'тот же lock',
+    31: 'в конец',
+    74: 'подписка',
+    76: 'по порядку',
+    78: 'обрыв',
+    79: 'и заново'
   }
 };
 
 const SOURCES = { server: 'solution/server/server.py', client: 'solution/client/client.py' };
 
 const CHANGES = {
-  'send:await-before': { added: [[21, '        await save_to_db(message)']] },
-  'send:await-inside': { added: [[23, '            await asyncio.sleep(0)']] },
-  'subscribe:await-inside': { added: [[23, '            await asyncio.sleep(0)']] },
-  'flush:nolock': { removed: [27, 33], dedent: [[28, 29], [34, 34]] },
-  'reconnect:noretry': { removed: [76, 81, 82], dedent: [[77, 80]] }
+  'send:await-before': { added: [[20, '        await save_to_db(message)']] },
+  'send:await-inside': { added: [[22, '            await asyncio.sleep(0)']] },
+  'subscribe:await-inside': { added: [[22, '            await asyncio.sleep(0)']] },
+  'flush:nolock': { removed: [24, 30], dedent: [[25, 26], [31, 31]] },
+  'reconnect:noretry': { removed: [73, 78, 79], dedent: [[74, 77]] }
 };
 
 const STATES = {
@@ -120,53 +120,53 @@ function* sendMessage(world, thread, { text, pause }) {
   const now = world.clock.shift();
   const stamp = Math.max(now, world.last + 1);
   thread.set('send_time_ns', String(stamp));
-  yield { lines: [18], note: `time_ns() = ${now} → max(${now}, ${world.last} + 1) = ${stamp}` };
+  yield { lines: [17], note: `time_ns() = ${now} → max(${now}, ${world.last} + 1) = ${stamp}` };
   world.last = stamp;
-  yield { lines: [19], note: `_last_time_ns = ${stamp}` };
+  yield { lines: [18], note: `_last_time_ns = ${stamp}` };
   const item = { author: thread.index, text, time: stamp };
   thread.set('message', `«${text}» · ${stamp}`);
-  yield { lines: [20, 21], note: `ChatMessage «${text}», sendTime = ${stamp}` };
-  if (pause === 'before') yield { lines: [21.5], note: 'await save_to_db — корутина отдаёт event loop', await: true };
+  yield { lines: [19, 20], note: `ReadMessagesResponse «${text}», sendTime = ${stamp}` };
+  if (pause === 'before') yield { lines: [20.5], note: 'await save_to_db — корутина отдаёт event loop', await: true };
   const size = world.subs.length;
   for (let index = 0; ; index++) {
     if (world.subs.length !== size) {
       world.errors.push(text);
-      return { lines: [22], note: 'RuntimeError: Set changed size during iteration', error: true };
+      return { lines: [21], note: 'RuntimeError: Set changed size during iteration', error: true };
     }
     if (index >= size) break;
     const target = world.subs[index];
     target.items.push(item);
-    yield { lines: [22, 23], note: `${target.name}.put_nowait(«${text}»)` };
-    if (pause === 'inside') yield { lines: [23.5], note: 'await asyncio.sleep(0) — рассылка прервалась на полпути', await: true };
+    yield { lines: [21, 22], note: `${target.name}.put_nowait(«${text}»)` };
+    if (pause === 'inside') yield { lines: [22.5], note: 'await asyncio.sleep(0) — рассылка прервалась на полпути', await: true };
   }
   world.replies.push(item);
-  return { lines: [24], note: `ответ: sendTime = ${stamp}` };
+  return { lines: [23], note: `ответ: sendTime = ${stamp}` };
 }
 
 function* readMessages(world, thread) {
   const own = queue('q2', 'клиент 2');
   world.late = own;
   thread.set('subscriber', 'q2');
-  yield { lines: [27], note: 'asyncio.Queue() — своя очередь' };
+  yield { lines: [26], note: 'asyncio.Queue() — своя очередь' };
   world.subs.push(own);
-  yield { lines: [28], note: 'q2 в _subscribers — подписка началась' };
+  yield { lines: [27], note: 'q2 в _subscribers — подписка началась' };
   for (;;) {
     if (!own.items.length && !world.hangup) {
       thread.state = 'wait';
       thread.waitFor = () => !own.items.length && !world.hangup;
-      yield { lines: [30, 31], note: 'await get() — ждёт сообщение, event loop свободен', await: true };
+      yield { lines: [29, 30], note: 'await get() — ждёт сообщение, event loop свободен', await: true };
       thread.waitFor = null;
       thread.state = 'run';
     }
     if (world.hangup) {
-      yield { lines: [31], note: 'клиент отключился — на await прилетает CancelledError' };
+      yield { lines: [30], note: 'клиент отключился — на await прилетает CancelledError' };
       world.subs.splice(world.subs.indexOf(own), 1);
-      return { lines: [32, 33], note: 'finally: discard(q2) — подписка снята' };
+      return { lines: [31, 32], note: 'finally: discard(q2) — подписка снята' };
     }
     const item = own.items.shift();
     own.sent.push(item);
     thread.set('message', `«${item.text}» · ${item.time}`);
-    yield { lines: [31], note: `yield «${item.text}» → в поток клиенту 2`, await: true };
+    yield { lines: [30], note: `yield «${item.text}» → в поток клиенту 2`, await: true };
   }
 }
 
@@ -178,26 +178,26 @@ function* hangup(world) {
 function* consume(world, thread, { locked }) {
   const item = world.incoming.shift();
   thread.set('message', `«${item.text}»`);
-  yield { lines: [77, 78, 79, 80], note: `из потока пришло «${item.text}» → put_message` };
-  if (locked) yield* acquire(thread, world.lock, 33);
+  yield { lines: [74, 75, 76, 77], note: `из потока пришло «${item.text}» → put_message` };
+  if (locked) yield* acquire(thread, world.lock, 30);
   world.messages.push(item);
   const held = world.lock.owner === thread;
   release(thread, world.lock);
-  yield { lines: [34], note: `_messages += «${item.text}»${held ? ' · lock свободен' : ''}` };
-  yield* sleepUntil(thread, () => true, [77], 'ждёт следующее сообщение из потока');
+  yield { lines: [31], note: `_messages += «${item.text}»${held ? ' · lock свободен' : ''}` };
+  yield* sleepUntil(thread, () => true, [74], 'ждёт следующее сообщение из потока');
 }
 
 function* collect(world, thread, { locked, number }) {
-  if (locked) yield* acquire(thread, world.lock, 27);
+  if (locked) yield* acquire(thread, world.lock, 24);
   const copy = world.messages.slice();
   thread.set('messages', `[${names(copy)}]`);
-  yield { lines: [28], note: `deepcopy → [${names(copy)}]` };
+  yield { lines: [25], note: `deepcopy → [${names(copy)}]` };
   world.messages = [];
-  yield { lines: [29], note: '_messages = []' };
+  yield { lines: [26], note: '_messages = []' };
   const held = world.lock.owner === thread;
   release(thread, world.lock);
   world.replies.push({ number, items: copy });
-  return { lines: [30], note: `${held ? 'lock свободен · ' : ''}ответ ${number}: [${names(copy)}]` };
+  return { lines: [27], note: `${held ? 'lock свободен · ' : ''}ответ ${number}: [${names(copy)}]` };
 }
 
 function* serve(world, thread, { locked }) {
@@ -207,22 +207,22 @@ function* serve(world, thread, { locked }) {
 
 function* reader(world, thread, { retry }) {
   for (;;) {
-    yield* sleepUntil(thread, () => world.server !== 'up', [77, 78], 'wait_for_ready: ждёт, пока сервер поднимется');
+    yield* sleepUntil(thread, () => world.server !== 'up', [74, 75], 'wait_for_ready: ждёт, пока сервер поднимется');
     world.stream = 'open';
-    yield { lines: retry ? [75, 76, 77, 78] : [75, 77, 78], note: 'ReadMessages — сервер зарегистрировал подписку' };
+    yield { lines: retry ? [72, 73, 74, 75] : [72, 74, 75], note: 'ReadMessages — сервер зарегистрировал подписку' };
     for (;;) {
-      yield* sleepUntil(thread, () => world.stream === 'open' && !world.inbox.length, [77], 'ждёт следующее сообщение');
+      yield* sleepUntil(thread, () => world.stream === 'open' && !world.inbox.length, [74], 'ждёт следующее сообщение');
       if (world.stream !== 'open') break;
       const item = world.inbox.shift();
       world.messages.push(item);
       thread.set('message', `«${item.text}»`);
-      yield { lines: [79, 80], note: `«${item.text}» → put_message` };
+      yield { lines: [76, 77], note: `«${item.text}» → put_message` };
     }
-    if (!retry) return { lines: [77], note: 'grpc.RpcError никто не поймал — поток-читатель умер', error: true };
+    if (!retry) return { lines: [74], note: 'grpc.RpcError никто не поймал — поток-читатель умер', error: true };
     thread.set('message', '—');
-    yield { lines: [81], note: 'except grpc.RpcError: поток оборван' };
+    yield { lines: [78], note: 'except grpc.RpcError: поток оборван' };
     thread.state = 'sleep';
-    yield { lines: [82], note: 'time.sleep(1) — и на новый круг' };
+    yield { lines: [79], note: 'time.sleep(1) — и на новый круг' };
     thread.state = 'run';
   }
 }
@@ -256,7 +256,7 @@ const LABS = {
   send: {
     variants: { ok: 'решение', 'await-before': 'await перед рассылкой', 'await-inside': 'await внутри рассылки' },
     cooperative: true,
-    panes: [{ file: 'server', title: 'SendMessage', range: [17, 24] }],
+    panes: [{ file: 'server', title: 'SendMessage', range: [16, 23] }],
     world: () => serverWorld([['q1', 'клиент 1'], ['q2', 'клиент 2']]),
     threads: [
       { name: 'корутина 1', call: 'SendMessage(alice, «привет»)', run: (world, thread, variant) => sendMessage(world, thread, { text: 'привет', pause: PAUSES[variant] }) },
@@ -284,8 +284,8 @@ const LABS = {
     variants: { ok: 'решение', 'await-inside': 'await внутри рассылки' },
     cooperative: true,
     panes: [
-      { file: 'server', title: 'SendMessage', range: [17, 24] },
-      { file: 'server', title: 'ReadMessages', range: [26, 33] }
+      { file: 'server', title: 'SendMessage', range: [16, 23] },
+      { file: 'server', title: 'ReadMessages', range: [25, 32] }
     ],
     world: () => serverWorld([['q1', 'клиент 1']]),
     threads: [
@@ -309,8 +309,8 @@ const LABS = {
   flush: {
     variants: { ok: 'решение', nolock: 'без lock' },
     panes: [
-      { file: 'client', title: 'PostBox', range: [21, 34] },
-      { file: 'client', title: '_consume_messages', range: [74, 82] }
+      { file: 'client', title: 'PostBox', range: [18, 31] },
+      { file: 'client', title: '_consume_messages', range: [71, 79] }
     ],
     world: () => ({ lock: new Lock(), messages: [{ author: 0, text: 'm1' }], incoming: [{ author: 0, text: 'm2' }], replies: [] }),
     threads: [
@@ -331,7 +331,7 @@ const LABS = {
   },
   reconnect: {
     variants: { ok: 'решение', noretry: 'без try/except' },
-    panes: [{ file: 'client', title: '_consume_messages', range: [74, 82] }],
+    panes: [{ file: 'client', title: '_consume_messages', range: [71, 79] }],
     world: () => ({ stream: 'none', server: 'up', inbox: [], messages: [], missed: [] }),
     threads: [
       { name: 'читатель', call: '_consume_messages(stub, postbox)', run: (world, thread, variant) => reader(world, thread, { retry: variant !== 'noretry' }) },
@@ -428,7 +428,7 @@ function loopBox(race) {
 
 function renderServer(world, race, seen, keys) {
   const card = element('div', 'world');
-  const head = element('div', 'world-head', '<b>MessengerServer</b>');
+  const head = element('div', 'world-head', '<b>MessengerService</b>');
   head.append(loopBox(race));
   card.append(head);
   const last = element('div', 'var', '<span class="var-name">_last_time_ns = </span>');

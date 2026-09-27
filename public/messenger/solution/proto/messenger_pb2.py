@@ -26,7 +26,7 @@ from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1esolution/proto/messenger.proto\x12\x08mes_grpc\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"2\n\x12SendMessageRequest\x12\x0e\n\x06\x61uthor\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"C\n\x13SendMessageResponse\x12,\n\x08sendTime\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"Y\n\x0b\x43hatMessage\x12\x0e\n\x06\x61uthor\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\x12,\n\x08sendTime\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp2\x9e\x01\n\x0fMessengerServer\x12J\n\x0bSendMessage\x12\x1c.mes_grpc.SendMessageRequest\x1a\x1d.mes_grpc.SendMessageResponse\x12?\n\x0cReadMessages\x12\x16.google.protobuf.Empty\x1a\x15.mes_grpc.ChatMessage0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1esolution/proto/messenger.proto\x12\x08mes_grpc\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"2\n\x12SendMessageRequest\x12\x0e\n\x06\x61uthor\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\"C\n\x13SendMessageResponse\x12,\n\x08sendTime\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"b\n\x14ReadMessagesResponse\x12\x0e\n\x06\x61uthor\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\x12,\n\x08sendTime\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp2\xa7\x01\n\x0fMessengerServer\x12J\n\x0bSendMessage\x12\x1c.mes_grpc.SendMessageRequest\x1a\x1d.mes_grpc.SendMessageResponse\x12H\n\x0cReadMessages\x12\x16.google.protobuf.Empty\x1a\x1e.mes_grpc.ReadMessagesResponse0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,8 +37,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SENDMESSAGEREQUEST']._serialized_end=156
   _globals['_SENDMESSAGERESPONSE']._serialized_start=158
   _globals['_SENDMESSAGERESPONSE']._serialized_end=225
-  _globals['_CHATMESSAGE']._serialized_start=227
-  _globals['_CHATMESSAGE']._serialized_end=316
-  _globals['_MESSENGERSERVER']._serialized_start=319
-  _globals['_MESSENGERSERVER']._serialized_end=477
+  _globals['_READMESSAGESRESPONSE']._serialized_start=227
+  _globals['_READMESSAGESRESPONSE']._serialized_end=325
+  _globals['_MESSENGERSERVER']._serialized_start=328
+  _globals['_MESSENGERSERVER']._serialized_end=495
 # @@protoc_insertion_point(module_scope)

@@ -43,7 +43,7 @@ class MessengerServerStub(object):
         self.ReadMessages = channel.unary_stream(
                 '/mes_grpc.MessengerServer/ReadMessages',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=solution_dot_proto_dot_messenger__pb2.ChatMessage.FromString,
+                response_deserializer=solution_dot_proto_dot_messenger__pb2.ReadMessagesResponse.FromString,
                 _registered_method=True)
 
 
@@ -73,7 +73,7 @@ def add_MessengerServerServicer_to_server(servicer, server):
             'ReadMessages': grpc.unary_stream_rpc_method_handler(
                     servicer.ReadMessages,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=solution_dot_proto_dot_messenger__pb2.ChatMessage.SerializeToString,
+                    response_serializer=solution_dot_proto_dot_messenger__pb2.ReadMessagesResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -129,7 +129,7 @@ class MessengerServer(object):
             target,
             '/mes_grpc.MessengerServer/ReadMessages',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            solution_dot_proto_dot_messenger__pb2.ChatMessage.FromString,
+            solution_dot_proto_dot_messenger__pb2.ReadMessagesResponse.FromString,
             options,
             channel_credentials,
             insecure,

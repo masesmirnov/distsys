@@ -15,9 +15,6 @@ from solution.proto import messenger_pb2
 from solution.proto import messenger_pb2_grpc
 
 
-RECONNECT_INTERVAL_S = 1
-
-
 class PostBox:
     def __init__(self):
         self._messages: List[Dict] = []
@@ -79,7 +76,7 @@ def _consume_messages(stub, postbox: PostBox):
                 postbox.put_message(google.protobuf.json_format.MessageToDict(
                     message, always_print_fields_with_no_presence=True))
         except grpc.RpcError:
-            time.sleep(RECONNECT_INTERVAL_S)
+            time.sleep(1)
 
 
 def main():
