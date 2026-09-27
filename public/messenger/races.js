@@ -718,7 +718,7 @@ class RaceLab {
       const who = element('span', `who t${last.thread}`, this.race.threads[last.thread].name);
       what.append(who, document.createTextNode(' ' + last.note));
     } else {
-      what.textContent = 'потоки ещё не начали';
+      what.textContent = this.race.cooperative ? 'корутины ещё не начали' : 'потоки ещё не начали';
     }
   }
 
