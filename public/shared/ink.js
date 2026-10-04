@@ -250,7 +250,7 @@ export function mark(target, kind, delay = 0) {
     render(svg, markStrokes(kind, width, height, target.textContent), animate && !calm.matches);
     if (animate) draw(svg, delay);
   };
-  paint(true);
+  document.fonts.ready.then(() => paint(true));
   let sized = false;
   const observer = new ResizeObserver(() => {
     if (!svg.isConnected) {
