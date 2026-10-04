@@ -704,16 +704,16 @@ class Board {
     const action = document.createElement('a');
     action.href = '#board';
     if (this.room === 'main') {
-      text.textContent = 'общая комната · ';
-      action.textContent = 'отдельная комната';
+      text.textContent = 'Общая комната, можно ';
+      action.textContent = 'завести отдельную';
       action.addEventListener('click', event => {
         event.preventDefault();
         this.switchRoom(randomId(8).toLowerCase());
         this.share();
       });
     } else {
-      text.textContent = `комната ${this.room} · видят только те, у кого эта ссылка · `;
-      action.textContent = 'в общую';
+      text.textContent = `Комната ${this.room}, её видят только те, у кого эта ссылка. `;
+      action.textContent = 'Вернуться в общую';
       action.addEventListener('click', event => {
         event.preventDefault();
         this.switchRoom('main');
