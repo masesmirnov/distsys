@@ -1,0 +1,217 @@
+{
+ "image": "distsys.ru/course/http-server@sha256:a6660c95e47e5098f0bc54370cd0af0b2514093f827b612372601c89365b0db6",
+ "score": 10,
+ "groups": [
+  {
+   "name": "G1",
+   "score": 3,
+   "max": 3,
+   "runs": [
+    {
+     "seed": 1337,
+     "queries": 20
+    },
+    {
+     "seed": 1338,
+     "queries": 20
+    },
+    {
+     "seed": 1339,
+     "queries": 20
+    }
+   ],
+   "contract": 3,
+   "exit_check": true
+  },
+  {
+   "name": "G2",
+   "score": 1,
+   "max": 1,
+   "runs": [
+    {
+     "seed": 93,
+     "queries": 40
+    },
+    {
+     "seed": 2945,
+     "queries": 40
+    },
+    {
+     "seed": 3110,
+     "queries": 40
+    }
+   ],
+   "contract": 1,
+   "exit_check": false
+  },
+  {
+   "name": "G3",
+   "score": 1,
+   "max": 1,
+   "runs": [
+    {
+     "seed": 5311,
+     "queries": 30
+    },
+    {
+     "seed": 2863,
+     "queries": 30
+    },
+    {
+     "seed": 6712,
+     "queries": 29
+    },
+    {
+     "seed": 7233,
+     "queries": 30
+    },
+    {
+     "seed": 7067,
+     "queries": 30
+    },
+    {
+     "seed": 3930,
+     "queries": 30
+    }
+   ],
+   "contract": 2,
+   "exit_check": false
+  },
+  {
+   "name": "G4",
+   "score": 2,
+   "max": 2,
+   "runs": [
+    {
+     "seed": 3152,
+     "queries": 30
+    },
+    {
+     "seed": 2929,
+     "queries": 30
+    },
+    {
+     "seed": 6554,
+     "queries": 30
+    },
+    {
+     "seed": 1388,
+     "queries": 30
+    },
+    {
+     "seed": 1672,
+     "queries": 30
+    },
+    {
+     "seed": 1769,
+     "queries": 30
+    }
+   ],
+   "contract": 26,
+   "exit_check": false
+  },
+  {
+   "name": "G5",
+   "score": 1,
+   "max": 1,
+   "runs": [
+    {
+     "seed": 7942,
+     "queries": 30
+    },
+    {
+     "seed": 1479,
+     "queries": 30
+    },
+    {
+     "seed": 3324,
+     "queries": 30
+    },
+    {
+     "seed": 6519,
+     "queries": 30
+    },
+    {
+     "seed": 3746,
+     "queries": 30
+    },
+    {
+     "seed": 1961,
+     "queries": 30
+    }
+   ],
+   "contract": 31,
+   "exit_check": false
+  },
+  {
+   "name": "G6",
+   "score": 1,
+   "max": 1,
+   "runs": [
+    {
+     "seed": 7824,
+     "queries": 25
+    },
+    {
+     "seed": 1671,
+     "queries": 25
+    },
+    {
+     "seed": 3793,
+     "queries": 25
+    },
+    {
+     "seed": 272,
+     "queries": 25
+    },
+    {
+     "seed": 2715,
+     "queries": 25
+    },
+    {
+     "seed": 1436,
+     "queries": 25
+    }
+   ],
+   "contract": 6,
+   "exit_check": false
+  },
+  {
+   "name": "G7",
+   "score": 1,
+   "max": 1,
+   "runs": [
+    {
+     "seed": 3224,
+     "queries": 30
+    },
+    {
+     "seed": 7507,
+     "queries": 30
+    },
+    {
+     "seed": 4172,
+     "queries": 30
+    },
+    {
+     "seed": 7777,
+     "queries": 30
+    },
+    {
+     "seed": 6666,
+     "queries": 30
+    },
+    {
+     "seed": 6094,
+     "queries": 30
+    },
+    {
+     "seed": 6442,
+     "queries": 30
+    }
+   ],
+   "contract": 10,
+   "exit_check": false
+  }
+ ]
+}

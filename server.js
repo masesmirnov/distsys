@@ -1,6 +1,7 @@
 'use strict';
 
 const http = require('node:http');
+const net = require('node:net');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
@@ -10,6 +11,9 @@ const PORT = Number(process.env.PORT) || 8094;
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC = path.join(__dirname, 'public');
 const CHAT_CLIENTS = (process.env.MESSENGER_CLIENTS || '').split(',').map(value => value.trim()).filter(Boolean);
+const FILE_SERVER = (process.env.HTTP_SERVER || '').trim();
+const BROKEN_SERVER = (process.env.HTTP_BROKEN || '').trim();
+const FILE_DOMAIN = (process.env.HTTP_DOMAIN || 'localhost').trim().toLowerCase();
 
 const BODY_LIMIT = 64 * 1024;
 const BACKLOG_LIMIT = 256 * 1024;
@@ -50,9 +54,47 @@ const CHAT_GLOBAL_WINDOW = 1000;
 const CHAT_GLOBAL_LIMIT = 8;
 const BURST_WINDOW = 6000;
 const BURST_TEXTS = [['A1', 'A2', 'A3'], ['B1', 'B2', 'B3']];
+const LIVE_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE']);
+const LIVE_HOSTS = new Set(['domain', 'other']);
+const LIVE_BODY_LIMIT = 4000;
+const LIVE_RESPONSE_LIMIT = 256 * 1024;
+const LIVE_TIMEOUT_MS = 4000;
+const LIVE_SPLIT_MS = 160;
+const LIVE_HISTORY = 12;
+const LIVE_ENTRIES = 40;
+const LIVE_DEPTH = 3;
+const LIVE_QUEUE_LIMIT = 6;
+const LIVE_IDLE_MS = 15 * 60 * 1000;
+const LIVE_WINDOW = 60_000;
+const LIVE_ADDRESS_LIMIT = 40;
+const LIVE_GLOBAL_WINDOW = 1000;
+const LIVE_GLOBAL_LIMIT = 6;
+const LIVE_SEED = [
+  { path: '/docs', dir: true },
+  { path: '/docs/notes', dir: true },
+  { path: '/docs/readme.txt', body: 'GET /docs вернёт листинг, в нём будет и этот файл.\n' },
+  { path: '/hello.txt', body: 'Привет! Этот файл лежит в папке настоящего server.py.\n' },
+  { path: '/.hidden', body: 'Скрытый файл, но в листинге он тоже есть.\n' }
+];
+const GAP_CHECKS = [
+  { tests: { method: 'GET', path: '/', host: 'tests' }, gap: { method: 'GET', path: '/', host: 'inside' } },
+  { tests: { method: 'POST', path: '/hello.txt/child', body: 'x' }, gap: { method: 'GET', path: '/hello.txt/child' } },
+  { tests: { method: 'GET', path: '/hello.txt', gzip: true }, gap: { method: 'GET', path: '/missing', gzip: true } },
+  { tests: { method: 'GET', path: '/docs' }, gap: { method: 'GET', path: '/docs/notes' } },
+  { tests: { method: 'GET', path: '/hello.txt' }, gap: { method: 'GET', path: '/hello.txt', host: 'nospace' } }
+];
 
 if (CHAT_CLIENTS.length && (CHAT_CLIENTS.length !== CHAT_CLIENT_COUNT || !CHAT_CLIENTS.every(value => /^[A-Za-z0-9.-]+:\d{1,5}$/.test(value)))) {
   throw new Error('MESSENGER_CLIENTS: нужны два адреса host:port через запятую');
+}
+if (FILE_SERVER && !/^[A-Za-z0-9.-]+:\d{1,5}$/.test(FILE_SERVER)) {
+  throw new Error('HTTP_SERVER: нужен адрес host:port');
+}
+if (BROKEN_SERVER && (!FILE_SERVER || !/^[A-Za-z0-9.-]+:\d{1,5}$/.test(BROKEN_SERVER))) {
+  throw new Error('HTTP_BROKEN: нужен адрес host:port и заданный HTTP_SERVER');
+}
+if (!/^[a-z0-9.-]{1,64}$/.test(FILE_DOMAIN)) {
+  throw new Error('HTTP_DOMAIN: нужно доменное имя');
 }
 
 const SITES = new Map([
@@ -67,6 +109,13 @@ const SITES = new Map([
     scenarios: new Set(['ok', 'nolock', 'noretry', 'await-before', 'await-inside']),
     presets: new Set(),
     chat: true
+  }],
+  ['http', {
+    labs: new Set(['bounds', 'large', 'gzip']),
+    scenarios: new Set(['ok', 'eof', 'recv', 'whole', 'length', 'memory']),
+    presets: new Set(),
+    chat: false,
+    live: true
   }]
 ]);
 const DEFAULT_SITE = 'guarantees';
@@ -137,6 +186,10 @@ const chatPeers = new Map();
 const chatAddresses = new Map();
 const chatGlobal = new Map();
 const chatBursts = new Map();
+const livePeers = new Map();
+const liveAddresses = new Map();
+const liveGlobal = new Map();
+const live = { queue: Promise.resolve(), waiting: 0, online: false, tree: null, entries: 0, history: [], gaps: {}, seq: 0, touched: 0, waking: false };
 const chat = {
   clients: CHAT_CLIENTS.map(address => {
     const [host, port] = address.split(':');
@@ -318,10 +371,12 @@ function openStream(req, res, url, site) {
   peer.streams.add(res);
   const hello = { you: peer.id, room: code, peers: peersOf(room, true), labs: room.labs, checker: room.checker, now: Date.now() };
   if (SITES.get(site).chat) hello.chat = chatSnapshot();
+  if (SITES.get(site).live) hello.live = liveSnapshot();
   const head = JSON.stringify(hello);
   deliver(res, chunkOf('hello', head.slice(0, -1) + ',"strokes":' + strokesJson(room) + '}'));
   broadcast(room, 'presence', { peers: peersOf(room) }, peer.id);
   if (SITES.get(site).chat) pollChat();
+  if (SITES.get(site).live) wakeLive();
 
   const beat = setInterval(() => deliver(res, ': ping\n\n'), 20_000);
 
@@ -721,6 +776,341 @@ async function handleChat(req, res, url, site) {
   setTimeout(pollChat, 400);
 }
 
+function liveRaw(method, path, host, extra = [], body = '') {
+  const payload = Buffer.from(body, 'utf8');
+  const lines = [`${method} ${path} HTTP/1.1`, host, ...extra];
+  if (method === 'POST' || method === 'PUT') lines.push(`Content-Length: ${payload.length}`);
+  return Buffer.concat([Buffer.from(lines.join('\r\n') + '\r\n\r\n', 'latin1'), payload]);
+}
+
+function internalRaw(method, path, extra, body) {
+  return liveRaw(method, path, `Host: ${FILE_DOMAIN}`, extra, body);
+}
+
+function liveExchange(parts, target = FILE_SERVER) {
+  const [host, port] = target.split(':');
+  return new Promise(resolve => {
+    const chunks = [];
+    let size = 0;
+    let settled = false;
+    const started = process.hrtime.bigint();
+    const socket = net.connect({ host, port: Number(port) });
+    const finish = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve({ raw: Buffer.concat(chunks), ms: Number(process.hrtime.bigint() - started) / 1e6, error });
+    };
+    const timer = setTimeout(() => finish('timeout'), LIVE_TIMEOUT_MS);
+    socket.on('connect', () => {
+      parts.forEach((part, index) => setTimeout(() => {
+        if (!settled) socket.write(part);
+      }, index * LIVE_SPLIT_MS));
+    });
+    socket.on('data', chunk => {
+      size += chunk.length;
+      if (size > LIVE_RESPONSE_LIMIT) finish('too large');
+      else chunks.push(chunk);
+    });
+    socket.on('end', () => finish(null));
+    socket.on('close', () => finish(null));
+    socket.on('error', error => finish(error.code || 'error'));
+  });
+}
+
+function liveParse(raw) {
+  const end = raw.indexOf('\r\n\r\n');
+  if (end < 0) return { status: 0, headers: {}, body: Buffer.alloc(0) };
+  const [statusLine, ...lines] = raw.subarray(0, end).toString('latin1').split('\r\n');
+  const headers = {};
+  for (const line of lines) {
+    const at = line.indexOf(':');
+    if (at > 0) headers[line.slice(0, at).trim().toLowerCase()] = line.slice(at + 1).trim();
+  }
+  return { status: Number(statusLine.split(' ')[1]) || 0, headers, body: raw.subarray(end + 4) };
+}
+
+async function liveAsk(method, path, extra, body, target = FILE_SERVER) {
+  const answer = liveParse((await liveExchange([internalRaw(method, path, extra, body)], target)).raw);
+  if (!answer.status) throw new Error('нет ответа');
+  return answer;
+}
+
+function namesOf(listing) {
+  return listing.toString('utf8').split('\n').filter(name => /^[A-Za-z0-9._-]{1,40}$/.test(name) && name !== '.' && name !== '..').sort();
+}
+
+async function walkLive() {
+  let entries = 0;
+  const visit = async (directory, listing, depth) => {
+    const nodes = [];
+    for (const name of namesOf(listing)) {
+      if (++entries > LIVE_ENTRIES) break;
+      const path = (directory === '/' ? '' : directory) + '/' + name;
+      const answer = await liveAsk('GET', path);
+      const folder = (answer.headers['content-type'] || '').startsWith('text/plain');
+      nodes.push(folder
+        ? { name, dir: true, children: depth < LIVE_DEPTH ? await visit(path, answer.body, depth + 1) : [] }
+        : { name, dir: false, size: answer.body.length });
+    }
+    return nodes;
+  };
+  const root = await liveAsk('GET', '/');
+  const tree = await visit('/', root.body, 1);
+  return { tree, entries };
+}
+
+async function seedLive(target, wipe) {
+  let created = false;
+  if (wipe) {
+    const root = await liveAsk('GET', '/', [], '', target);
+    for (const name of namesOf(root.body)) await liveAsk('DELETE', '/' + name, ['Remove-Directory: True'], '', target);
+  }
+  for (const item of LIVE_SEED) {
+    const answer = await liveAsk('POST', item.path, item.dir ? ['Create-Directory: True'] : [], item.body || '', target);
+    created = created || answer.status === 200;
+  }
+  return created;
+}
+
+async function resetLive() {
+  await seedLive(FILE_SERVER, true);
+  if (BROKEN_SERVER) await seedLive(BROKEN_SERVER, true).catch(() => false);
+  return walkLive();
+}
+
+function liveTask(work) {
+  if (live.waiting >= LIVE_QUEUE_LIMIT) return Promise.reject(new Error('busy'));
+  live.waiting += 1;
+  const result = live.queue.then(work);
+  live.queue = result.catch(() => {}).finally(() => {
+    live.waiting -= 1;
+  });
+  return result;
+}
+
+function liveBroadcast(data) {
+  for (const room of rooms.values()) {
+    if (SITES.get(room.site).live) broadcast(room, 'live', data);
+  }
+}
+
+function liveSnapshot() {
+  return { enabled: Boolean(FILE_SERVER), broken: Boolean(BROKEN_SERVER), domain: FILE_DOMAIN, online: live.online, tree: live.tree, history: live.history, gaps: live.gaps };
+}
+
+function applyWalk(walked) {
+  live.online = true;
+  live.tree = walked.tree;
+  live.entries = walked.entries;
+  live.touched = Date.now();
+}
+
+function wakeLive() {
+  if (!FILE_SERVER || live.waking || (live.tree && Date.now() - live.touched < LIVE_IDLE_MS)) return;
+  live.waking = true;
+  liveTask(resetLive)
+    .then(walked => {
+      applyWalk(walked);
+      live.history = [];
+      live.gaps = {};
+      liveBroadcast({ t: 'reset', tree: live.tree, online: true });
+    }, () => {
+      live.online = false;
+      liveBroadcast({ t: 'status', online: false });
+    })
+    .finally(() => {
+      live.waking = false;
+    });
+}
+
+function livePath(value) {
+  if (value === '/') return value;
+  if (typeof value !== 'string' || value.length > 120 || !value.startsWith('/')) return null;
+  const parts = value.slice(1).split('/');
+  if (parts.length > LIVE_DEPTH || parts.some(part => !/^[A-Za-z0-9._-]{1,40}$/.test(part) || part === '.' || part === '..')) return null;
+  return value;
+}
+
+function liveSpec(payload) {
+  const method = payload.method;
+  const path = livePath(payload.path);
+  const body = typeof payload.body === 'string' ? payload.body : '';
+  if (!LIVE_METHODS.has(method) || !path || Array.from(body).length > LIVE_BODY_LIMIT) return null;
+  const writes = method === 'POST' || method === 'PUT';
+  return {
+    method,
+    path,
+    host: LIVE_HOSTS.has(payload.host) ? payload.host : 'domain',
+    body: writes ? body.toWellFormed() : '',
+    create: method === 'POST' && payload.create === true,
+    remove: method === 'DELETE' && payload.remove === true,
+    gzip: method === 'GET' && payload.gzip === true,
+    split: payload.split === true
+  };
+}
+
+function liveRequest(spec) {
+  const host = {
+    domain: `Host: ${FILE_DOMAIN}`,
+    other: 'Host: example.com',
+    tests: 'Host: hse.ru',
+    inside: `Host: ${FILE_DOMAIN}.evil.com`,
+    nospace: `Host:${FILE_DOMAIN}`
+  }[spec.host];
+  const extra = [];
+  if (spec.create) extra.push('Create-Directory: True');
+  if (spec.remove) extra.push('Remove-Directory: True');
+  if (spec.gzip) extra.push('Accept-Encoding: gzip');
+  return liveRaw(spec.method, spec.path, host, extra, spec.body);
+}
+
+function splitRequest(raw) {
+  const boundary = raw.indexOf('\r\n\r\n');
+  return [raw.subarray(0, 9), raw.subarray(9, boundary + 3), raw.subarray(boundary + 3)];
+}
+
+function unzipped(parsed) {
+  if (parsed.headers['content-encoding'] !== 'gzip') return null;
+  try {
+    return zlib.gunzipSync(parsed.body).toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+function liveEntry(peer, raw, parts, answer) {
+  const parsed = liveParse(answer.raw);
+  return {
+    id: ++live.seq,
+    by: peer.name,
+    at: Date.now(),
+    ms: Math.round(answer.ms * 10) / 10,
+    error: answer.error,
+    request: raw.toString('base64'),
+    parts: parts.map(part => part.length),
+    response: answer.raw.toString('base64'),
+    status: parsed.status,
+    decoded: unzipped(parsed)
+  };
+}
+
+async function runGap(index) {
+  const restored = await seedLive(FILE_SERVER, false);
+  await seedLive(BROKEN_SERVER, false);
+  const rows = {};
+  for (const kind of ['tests', 'gap']) {
+    const spec = GAP_CHECKS[index][kind];
+    const raw = liveRequest({ host: 'domain', body: '', create: false, remove: false, gzip: false, split: false, ...spec });
+    rows[kind] = {};
+    for (const [side, target] of [['broken', BROKEN_SERVER], ['ours', FILE_SERVER]]) {
+      const answer = await liveExchange([raw], target);
+      const parsed = liveParse(answer.raw);
+      rows[kind][side] = { request: raw.toString('base64'), response: answer.raw.toString('base64'), status: parsed.status, error: answer.error, decoded: unzipped(parsed) };
+    }
+  }
+  return { rows, walked: restored ? await walkLive() : null };
+}
+
+async function handleLive(req, res, url, site) {
+  const code = url.searchParams.get('room') || 'main';
+  const cid = url.searchParams.get('cid');
+  if (req.method !== 'POST' || !SITES.get(site).live || !validRoom(code) || !validId(cid)) {
+    json(res, 400, { error: 'плохой запрос' });
+    return;
+  }
+  if (!FILE_SERVER) {
+    json(res, 503, { error: 'живой сервер выключен' });
+    return;
+  }
+  const room = rooms.get(roomKey(site, code));
+  const peer = room && room.peers.get(cid);
+  if (!peer) {
+    json(res, 409, { error: 'нет подключения к комнате' });
+    return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await readBody(req));
+  } catch {
+    json(res, 400, { error: 'плохой запрос' });
+    return;
+  }
+  if (!payload || typeof payload !== 'object') {
+    json(res, 400, { error: 'плохой запрос' });
+    return;
+  }
+  const gap = Number.isInteger(payload.gap) ? payload.gap : null;
+  if (gap !== null && (!BROKEN_SERVER || gap < 0 || gap >= GAP_CHECKS.length)) {
+    json(res, 400, { error: 'такой проверки нет' });
+    return;
+  }
+  const spec = payload.reset === true || gap !== null ? null : liveSpec(payload);
+  if (payload.reset !== true && gap === null && !spec) {
+    json(res, 400, { error: 'такой запрос живой сервер не примет: имена из латиницы, цифр, точки, дефиса и подчёркивания' });
+    return;
+  }
+  if (!hit(livePeers, cid, CHAT_PEER_WINDOW, CHAT_PEER_LIMIT) || !hit(liveAddresses, addressOf(req), LIVE_WINDOW, LIVE_ADDRESS_LIMIT)
+    || !hit(liveGlobal, 'send', LIVE_GLOBAL_WINDOW, LIVE_GLOBAL_LIMIT)) {
+    json(res, 429, { error: 'слишком часто' });
+    return;
+  }
+  if (spec && spec.method === 'POST' && live.entries >= LIVE_ENTRIES) {
+    json(res, 507, { error: 'в папке уже 40 объектов: сбросьте её' });
+    return;
+  }
+  try {
+    if (gap !== null) {
+      const outcome = await liveTask(() => runGap(gap));
+      if (outcome.walked) {
+        applyWalk(outcome.walked);
+        liveBroadcast({ t: 'tree', tree: live.tree });
+      }
+      live.online = true;
+      live.gaps[gap] = { by: peer.name, at: Date.now(), rows: outcome.rows };
+      liveBroadcast({ t: 'gap', n: gap, result: live.gaps[gap] });
+      json(res, 200, { ok: true });
+      return;
+    }
+    if (!spec) {
+      applyWalk(await liveTask(resetLive));
+      live.history = [];
+      live.gaps = {};
+      liveBroadcast({ t: 'reset', tree: live.tree, online: true, by: peer.name });
+      json(res, 200, { ok: true });
+      return;
+    }
+    const outcome = await liveTask(async () => {
+      const raw = liveRequest(spec);
+      const parts = spec.split ? splitRequest(raw) : [raw];
+      const answer = await liveExchange(parts);
+      if (!answer.raw.length) throw new Error('silent');
+      const entry = liveEntry(peer, raw, parts, answer);
+      const walked = spec.method === 'GET' ? null : await walkLive();
+      return { entry, walked };
+    });
+    if (outcome.walked) applyWalk(outcome.walked);
+    live.online = true;
+    live.touched = Date.now();
+    live.history = live.history.concat(outcome.entry).slice(-LIVE_HISTORY);
+    liveBroadcast({ t: 'exchange', entry: outcome.entry, tree: outcome.walked ? live.tree : null });
+    json(res, 200, { ok: true, id: outcome.entry.id });
+  } catch (error) {
+    if (error.message === 'busy') {
+      json(res, 429, { error: 'сервер занят: попробуйте через секунду' });
+      return;
+    }
+    if (gap !== null) {
+      json(res, 502, { error: 'одна из копий сервера не ответила' });
+      return;
+    }
+    live.online = false;
+    liveBroadcast({ t: 'status', online: false });
+    json(res, 502, { error: 'живой сервер не ответил' });
+  }
+}
+
 function serveAsset(req, res, url, site) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY });
@@ -760,6 +1150,8 @@ const server = http.createServer(async (req, res) => {
       await handleOps(req, res, url, site);
     } else if (url.pathname === '/api/chat') {
       await handleChat(req, res, url, site);
+    } else if (url.pathname === '/api/live') {
+      await handleLive(req, res, url, site);
     } else {
       serveAsset(req, res, url, site);
     }
@@ -785,7 +1177,8 @@ function prune() {
   for (const [key, room] of rooms) {
     if (!room.peers.size && now - room.idleSince > ROOM_TTL) rooms.delete(key);
   }
-  const windows = [[opens, OPEN_WINDOW], [addressOps, OPS_WINDOW], [peerOps, OPS_WINDOW], [chatPeers, CHAT_PEER_WINDOW], [chatAddresses, CHAT_WINDOW], [chatGlobal, CHAT_GLOBAL_WINDOW], [chatBursts, BURST_WINDOW]];
+  const windows = [[opens, OPEN_WINDOW], [addressOps, OPS_WINDOW], [peerOps, OPS_WINDOW], [chatPeers, CHAT_PEER_WINDOW], [chatAddresses, CHAT_WINDOW], [chatGlobal, CHAT_GLOBAL_WINDOW], [chatBursts, BURST_WINDOW],
+    [livePeers, CHAT_PEER_WINDOW], [liveAddresses, LIVE_WINDOW], [liveGlobal, LIVE_GLOBAL_WINDOW]];
   for (const [counters, window] of windows) {
     for (const [key, entry] of counters) {
       if (now - entry.start >= window) counters.delete(key);
