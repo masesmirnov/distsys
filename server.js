@@ -1175,7 +1175,7 @@ function evictIdleRoom() {
 function prune() {
   const now = Date.now();
   for (const [key, room] of rooms) {
-    if (!room.peers.size && now - room.idleSince > ROOM_TTL) rooms.delete(key);
+    if (!room.peers.size && room.code !== 'main' && now - room.idleSince > ROOM_TTL) rooms.delete(key);
   }
   const windows = [[opens, OPEN_WINDOW], [addressOps, OPS_WINDOW], [peerOps, OPS_WINDOW], [chatPeers, CHAT_PEER_WINDOW], [chatAddresses, CHAT_WINDOW], [chatGlobal, CHAT_GLOBAL_WINDOW], [chatBursts, BURST_WINDOW],
     [livePeers, CHAT_PEER_WINDOW], [liveAddresses, LIVE_WINDOW], [liveGlobal, LIVE_GLOBAL_WINDOW]];
